@@ -4,6 +4,8 @@ A web app for exploring customer churn: who is most likely to leave, which input
 
 The app compares logistic regression with XGBoost, explains individual predictions with SHAP, and calculates retention scenarios. It runs in Streamlit and uses the IBM Telco Customer Churn dataset, also available on Kaggle.
 
+**[Open the live app](https://customer-churn-tool-gupuvojt3rwndamjdgahnv.streamlit.app/)** · [Reading the dashboard](docs/READING_THE_DASHBOARD.md) · [Methodology](docs/METHODOLOGY.md)
+
 ## Project contribution
 
 A risk score is only part of a retention decision. Someone using the app also needs to understand the prediction and weigh the cost of acting on it.
@@ -12,15 +14,20 @@ This project connects those steps in one interface. Users can compare models, in
 
 ## Using the app
 
-1. Click **Use sample data**, or upload a compatible CSV containing historical customer outcomes.
-2. Review the cleaning notes and model comparison.
-3. Inspect the customers ranked by predicted churn risk.
-4. Select a customer to see the inputs that push the prediction up or down.
-5. Adjust the offer cost, customer value, contact percentage, and assumed offer success rate to explore potential savings.
+Choose **Use sample data** in the sidebar, or upload a compatible historical CSV. The dashboard is organized into four tabs:
+
+| Tab | What it shows | Question it answers |
+|---|---|---|
+| Customers | Outcome counts, missing values, churn within groups | What does the historical data contain? |
+| Models | Precision/recall bars, precision–recall curves, a confusion-matrix heatmap | How useful are the predictions, and where are the mistakes? |
+| Individual risk | Score distribution, a churn-capture curve, a ranked list, individual SHAP bars | Who receives high scores, and which inputs influence them? |
+| Retention plan | Cost/benefit bars and savings across campaign sizes | What could contacting these customers cost or save? |
+
+Charts include hover details, labeled axes, and short explanations. Detailed interpretation, worked examples, and caveats are in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
 
 The app downloads the sample automatically. If the download fails, it uses clearly labeled fictional data so the interface remains usable.
 
-Rankings cover the held-out test customers, whose outcomes were not used for training or model selection. This version evaluates historical customers; it does not yet score a separate upload of future customers without known outcomes.
+Rankings cover held-out test customers, whose outcomes were not used for training or model selection. This version evaluates historical customers; it does not yet score a separate file of future customers without known outcomes.
 
 ## How it works
 
@@ -78,7 +85,7 @@ To run the automated checks:
 python -m pytest -q
 ```
 
-The project was checked on Python 3.12.14 on Linux, with 17 tests passing. Checks cover input validation, offline loading, data splits, training-only preprocessing, both SHAP explainers, business calculations, uploads, and caching.
+The project was checked on Python 3.12.14 on Linux, with 21 tests passing. Checks cover input validation, offline loading, data splits, training-only preprocessing, both SHAP explainers, business calculations, uploads, caching, chart serialization, group summaries, and agreement between the savings curve and calculator.
 
 ## Repository structure
 
@@ -89,8 +96,11 @@ The project was checked on Python 3.12.14 on Linux, with 17 tests passing. Check
 | `src/model.py` | Preprocessing, splitting, training, evaluation, and ranking |
 | `src/explain.py` | Individual SHAP explanations |
 | `src/business.py` | Retention scenario calculations |
+| `src/charts.py` | Interactive charts and visual summaries |
 | `tests/test_basic.py` | Automated checks |
 | `docs/METHODOLOGY.md` | Data requirements and implementation details |
+| `docs/READING_THE_DASHBOARD.md` | Chart interpretation, examples, and caveats |
+| `.streamlit/config.toml` | Consistent light theme and upload limit |
 | `requirements.txt` | Pinned application dependencies |
 
 ## Limitations

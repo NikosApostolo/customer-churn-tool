@@ -1,5 +1,7 @@
 # Methodology
 
+For chart-by-chart explanations and examples, see [Reading the dashboard](READING_THE_DASHBOARD.md).
+
 ## Input data
 
 The app accepts a UTF-8, comma-separated CSV containing historical customer records. Files must be at most 10 MB, with 100–15,000 rows and at least 20 examples of each outcome.
@@ -100,3 +102,14 @@ The app converts validation failures into readable messages. Unexpected errors a
 This is an application of established machine learning methods to a retention workflow. Its practical contribution is connecting model comparison, customer ranking, individual explanations, and campaign assumptions in one interface.
 
 Separate scoring of unlabeled future customers, time-based validation, probability calibration, fairness assessment, campaign experiments, and production access controls remain outside the current implementation.
+
+
+## Visual summaries
+
+Interactive charts are implemented in `src/charts.py` with Altair. Customer exploration summarizes the full historical input, while model metrics, risk rankings, capture curves, and campaign scenarios use held-out test customers. Chart data is derived from the same trained bundle used for the displayed results.
+
+The capture curve cumulatively counts actual test churners in descending risk order. Its diagonal reference represents random selection in expectation. The campaign curve applies the exact calculator formula at each integer contact percentage, with the same rounding rule for contact counts. Automated checks compare these curve values against the calculator.
+
+The precision–recall chart varies the decision threshold for display only. Neither this curve nor the test capture curve changes model selection or the fixed 0.50 classification threshold. Large precision–recall displays are limited to 2,000 points per model, retaining endpoints; scores and metrics always use all observations.
+
+The four-tab layout separates exploration, evaluation, individual explanations, and business assumptions. Expandable sections retain exact scores and technical details without making raw tables the main interface. The visual redesign does not change model settings, the data split, or the measured Telco results above.

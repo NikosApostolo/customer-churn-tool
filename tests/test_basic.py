@@ -146,7 +146,8 @@ def test_upload_interface_and_cached_controls() -> None:
             assert not app.exception and not app.error
             assert training.call_count == 1
             assert any(m.label == "Scenario net savings" and m.value == "0.00" for m in app.metric)
-            app.selectbox[1].set_value(app.selectbox[1].options[-1]).run()
+            customer = next(control for control in app.selectbox if control.label == "Customer")
+            customer.set_value(customer.options[-1]).run()
             assert not app.exception and not app.error
             assert training.call_count == 1
 
@@ -166,3 +167,50 @@ def test_zero_contribution_sentence() -> None:
     from src.explain import explanation_sentence
     reasons = pd.DataFrame({"Feature": ["tenure"], "Value": ["1"], "Contribution": [0.0]})
     assert "No input feature changes" in explanation_sentence(reasons)
+
+
+def test_campaign_curve_matches_calculator() -> None:
+    from src.charts import campaign_curve
+    ranked = pd.DataFrame({"risk_score": [0.08, 0.91, 0.53, 0.67, 0.22, 0.31, 0.48]})
+    curve = campaign_curve(ranked, 17, 430, 0.18)
+    for share in [0, 1, 20, 35, 99, 100]:
+        expected = estimate_savings(ranked, share, 17, 430, 0.18)
+        assert curve.loc[curve["Contact share"] == share, "Net savings"].iloc[0] == pytest.approx(expected["net_savings"])
+
+
+def test_capture_curve_uses_ranked_test_outcomes() -> None:
+    from src.charts import capture_summary
+    ranked = pd.DataFrame({"row_index": [3, 1, 4], "risk_score": [0.9, 0.6, 0.2]})
+    truth = pd.Series([1, 0, 1, 1, 1])
+    curve = capture_summary(ranked, truth)
+    np.testing.assert_allclose(curve["Churners found"], [0, 0.5, 0.5, 1])
+    assert curve["Contact share"].iloc[-1] == 1
+
+
+def test_group_churn_rates_and_numeric_order() -> None:
+    from src.charts import feature_summary
+    X = pd.DataFrame({"tenure": np.arange(100)})
+    y = pd.Series((np.arange(100) >= 50).astype(int))
+    summary = feature_summary(X, y, "tenure")
+    assert summary.Customers.sum() == len(X)
+    assert (summary["Churn rate"] * summary.Customers).sum() == pytest.approx(y.sum())
+    assert summary.Order.is_monotonic_increasing
+
+
+def test_chart_specs_on_real_pipeline(trained: tuple) -> None:
+    from src import charts
+    X, y, ids, result = trained
+    ranked = rank_customers(result, X, ids)
+    scores = {name: model.predict_proba(X.iloc[result["test_idx"]])[:, 1] for name, model in result["models"].items()}
+    reasons = explain_customer(result["models"][result["winner"]], X.iloc[result["train_idx"]], X.iloc[[int(ranked.iloc[0].row_index)]])
+    savings = estimate_savings(ranked, 20, 20, 500, 0.15)
+    figures = [
+        charts.outcomes_chart(y), charts.missing_chart(X),
+        charts.feature_chart(charts.feature_summary(X, y, "Contract")),
+        charts.comparison_chart(result["metrics"]), charts.pr_chart(y.iloc[result["test_idx"]], scores),
+        charts.confusion_chart(result["matrices"][result["winner"]]), charts.distribution_chart(ranked),
+        charts.capture_chart(charts.capture_summary(ranked, y)), charts.shap_chart(reasons),
+        charts.savings_curve_chart(charts.campaign_curve(ranked, 20, 500, 0.15), 20), charts.money_chart(savings),
+    ]
+    for figure in figures:
+        figure.to_json()
