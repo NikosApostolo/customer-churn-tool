@@ -57,9 +57,7 @@ def load_input() -> tuple[bytes | None, str]:
     panel = st.expander("Change customer data", expanded=False) if loaded else st.container(border=True, key="data_start")
     with panel:
         if not loaded:
-            st.caption("GET STARTED")
-            st.subheader("Choose your data")
-            st.write("Try the built-in example or bring a customer CSV.")
+            st.subheader("Get started")
         source = st.radio("Choose data", ["Sample data", "Upload CSV"], key="input_source", horizontal=True)
         if source == "Sample data":
             if not loaded:
@@ -73,113 +71,67 @@ def load_input() -> tuple[bytes | None, str]:
             label = "Uploaded customer data"
             if not loaded:
                 st.caption("Include a Churn column with Yes/No or 1/0 historical outcomes. Maximum 10 MB.")
-        caption("Use public or fictional data. Uploads are processed on the server and cached in memory for up to 30 minutes.")
+        caption("Use public or fictional data only.")
+        st.markdown(f"[CSV requirements and privacy]({REPO}/blob/main/docs/METHODOLOGY.md#input-data)")
     return content, label
 
 
 def customers_view(bundle: dict[str, Any]) -> None:
     X, y, result = bundle["X"], bundle["y"], bundle["result"]
-    st.subheader("Start with the customers")
-    st.write("Churn means a customer left the service. These are recorded historical outcomes, not model predictions.")
-    a, b = st.columns([1.1, 1])
-    with a:
-        st.markdown("#### How many stayed or left?")
-        draw(charts.outcomes_chart(y))
-        st.write(f"**{int(y.sum()):,} of {len(y):,} customers left ({y.mean():.1%}).** A model can miss churners even if it correctly predicts that most customers stay.")
-    with b:
-        st.markdown("#### Is anything missing?")
-        draw(charts.missing_chart(X))
-        missing = int(X.isna().sum().sum())
-        st.write(f"**{missing:,} feature values need filling.** Replacement values are learned from training customers only.")
-    st.markdown("#### Where does observed churn differ?")
+    st.subheader("Your customers")
+    draw(charts.outcomes_chart(y))
+    caption(f"{int(y.sum()):,} customers left ({y.mean():.1%}). These are historical outcomes.")
+    st.markdown("#### Churn by customer group")
     features = list(X.columns)
-    default = features.index("Contract") if "Contract" in features else 0
-    feature = st.selectbox("Compare customer groups by", features, index=default, key="group_feature", format_func=charts.feature_name)
+    feature = st.selectbox("Compare by", features, index=features.index("Contract") if "Contract" in features else 0, key="group_feature", format_func=charts.feature_name)
     summary = charts.feature_summary(X, y, feature)
     draw(charts.feature_chart(summary))
-    caption("Each bar is the share who left within that group. Tap or hover for details, or open the values below. Small groups are less reliable. Numeric inputs are divided into six equal-width ranges. These are associations across the uploaded data, not proof of causes.")
-    with st.expander("Group rates and customer counts"):
+    caption("Bars show the share who left in each group. A difference is an association, not a cause.")
+    with st.expander("Group counts"):
         values = summary[["Group", "Customers", "Churn rate"]].copy()
-        values["Churn rate"] = values["Churn rate"].map(lambda rate: f"{rate:.1%}")
+        values["Churn rate"] = values["Churn rate"].map(lambda v: f"{v:.1%}")
         st.dataframe(values, hide_index=True, use_container_width=True)
-    with st.expander("Cleaning notes and supported CSV format"):
+    with st.expander("Data checks"):
+        missing = int(X.isna().sum().sum())
+        st.write(f"{missing:,} feature values need filling, using training data only.")
+        if missing:
+            draw(charts.missing_chart(X))
         for note in bundle["notes"]:
             st.write(note)
-        st.write("Provide 100–15,000 rows, a Churn column containing Yes/No or 1/0, at least 20 examples in each class, and supported Telco features. customerID is optional and must be unique when supplied. Maximum file size: 10 MB.")
-        st.markdown(f"[Full input column list and cleaning rules]({REPO}/blob/main/docs/METHODOLOGY.md#input-data)")
         st.dataframe(X.head(10), use_container_width=True)
-    with st.expander("Which customers are used at each stage?"):
-        sizes = pd.DataFrame({"Stage": ["Training: learn patterns", "Validation: choose model", "Test: check results"], "Customers": [len(result[k]) for k in ["train_idx", "val_idx", "test_idx"]]})
-        st.bar_chart(sizes.set_index("Stage"), color=charts.TEAL)
-        st.write("The split is approximately 60% / 20% / 20%. Test customers do not teach or select the model. Rankings and campaign scenarios use this unseen test group.")
+        caption("Split: 60% training, 20% validation, 20% test. Test customers do not train or select the model.")
+        st.markdown(f"[Data and training details]({REPO}/blob/main/docs/METHODOLOGY.md)")
 
 
 def models_view(bundle: dict[str, Any]) -> None:
-    result, y = bundle["result"], bundle["y"]
-    truth = y.iloc[result["test_idx"]]
-    selected = result["metrics"].set_index("Model").loc[result["winner"]]
-    st.subheader("How useful are the predictions?")
-    st.write("Two models learn the same training customers. Logistic regression is the simpler reference; XGBoost combines small decision trees to learn more complex patterns.")
-    st.success(f"Selected model: **{result['winner']}** — chosen using ranking quality on validation customers, before looking at test outcomes.")
-    a, b, c = st.columns(3)
-    a.metric("Correct churn flags · precision", f"{selected['Test precision']:.1%}")
-    b.metric("Actual churners found · recall", f"{selected['Test recall']:.1%}")
-    c.metric("Test ranking score · AP", f"{selected['Test AP']:.3f}")
-    a, b = st.columns(2)
-    with a:
-        st.markdown("#### Correct flags vs churners found")
-        draw(charts.comparison_chart(result["metrics"]))
-        st.write("**Precision:** of the customers flagged as leaving, how many really left? **Recall:** of all customers who left, how many did we flag?")
-        caption("Both models flag churn at a score of 50% or more. A higher bar is better for that measure; the two measures can trade off.")
-    with b:
-        st.markdown("#### The tradeoff across decision thresholds")
-        draw(charts.pr_chart(truth, bundle["scores"]))
-        st.write("Each line shows the precision–recall tradeoff as the cutoff changes. Closer to the top-right is better. The dashed line is the test churn rate, a no-skill reference.")
-        caption("AP (average precision) summarizes this ranking performance. It is not accuracy. This chart does not change the fixed 50% cutoff or choose the model.")
-    st.markdown("#### Where are the mistakes?")
+    result = bundle["result"]
+    st.subheader("Model comparison")
+    caption(f"Selected: {result['winner']} · chosen on validation data. Results below use unseen test customers.")
+    draw(charts.comparison_chart(result["metrics"]))
+    st.write("**Precision:** how many flagged customers actually left.\n\n**Recall:** how many actual churners were found.")
     names = list(result["models"])
     name = st.selectbox("Confusion matrix for", names, index=names.index(result["winner"]), key="matrix_model")
-    a, b = st.columns([1, 1])
+    draw(charts.confusion_chart(result["matrices"][name]))
     matrix = result["matrices"][name]
-    with a:
-        draw(charts.confusion_chart(matrix))
-    with b:
-        st.markdown(f"**{matrix[1, 1]:,} churners found**\n\nCustomers who left and were correctly flagged.")
-        st.markdown(f"**{matrix[1, 0]:,} churners missed**\n\nCustomers who left but were predicted to stay.")
-        st.markdown(f"**{matrix[0, 1]:,} false alarms**\n\nCustomers flagged as leaving who actually stayed.")
-        caption(f"The remaining {matrix[0, 0]:,} customers were correctly predicted to stay. Rows show actual outcomes; columns show predictions.")
-    with st.expander("Exact scores and selection details"):
+    caption(f"{matrix[1, 1]:,} churners found · {matrix[1, 0]:,} missed · {matrix[0, 1]:,} false alarms. Rows = actual; columns = predicted.")
+    with st.expander("Detailed evaluation"):
+        draw(charts.pr_chart(bundle["y"].iloc[result["test_idx"]], bundle["scores"]))
+        caption("Higher precision and recall are better. The dashed line is the test churn rate. This chart varies the cutoff for display only.")
         st.dataframe(result["metrics"].round(4), hide_index=True, use_container_width=True)
-        st.write("Validation AP chooses the model. Test AP reports its ranking quality on unseen customers. Brier score measures squared probability error; lower is better. It does not alone prove that the probabilities match real-world frequencies.")
-        st.markdown(f"[Evaluation method and limitations]({REPO}/blob/main/docs/METHODOLOGY.md#evaluation)")
+        st.write("Both models flag churn at 50% risk. Validation average precision (AP) selects the model; test outcomes do not. Brier score measures probability error, with lower values better.")
+        st.markdown(f"[How evaluation works]({REPO}/blob/main/docs/METHODOLOGY.md#evaluation)")
 
 
 def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> None:
-    st.subheader("Explore risk, then inspect a customer")
-    st.write("These scores belong to customers excluded from training and model selection. They estimate risk; they do not guarantee who will leave.")
-    a, b = st.columns(2)
-    with a:
-        st.markdown("#### How is risk distributed?")
-        draw(charts.distribution_chart(ranked))
-        caption("Each bar counts customers in a 10-point risk range. A score of 70% is an estimate, not a certainty; probability calibration has not been established.")
-    with b:
-        st.markdown("#### Does ranking help find churners?")
-        capture = charts.capture_summary(ranked, bundle["y"])
-        draw(charts.capture_chart(capture))
-        count = int(np.ceil(len(ranked) * 0.2))
-        total = int(bundle["y"].iloc[ranked.row_index].sum())
-        found = int(bundle["y"].iloc[ranked.head(count).row_index].sum())
-        st.write(f"The top **20%** of test customers contain **{found / total:.1%}** of the actual churners." if total else "There are no actual churners in this test group.")
-        caption("The dashed line represents random selection in expectation. This is a historical ranking check, not evidence that an offer prevents churn.")
-    st.markdown("#### Customer risk list")
+    st.subheader("Customer risk")
+    caption(f"{len(ranked):,} unseen test customers, highest risk first. Scores are estimates, not certainties.")
     visible = ranked[["customerID", "risk_score"]].copy()
     visible["risk_percent"] = (visible.pop("risk_score").astype(float) * 100).round(1)
     st.dataframe(visible, column_config={
         "customerID": st.column_config.TextColumn("Customer", width="small"),
         "risk_percent": st.column_config.ProgressColumn("Risk", width="small", format="%.1f%%", min_value=0, max_value=100),
     }, hide_index=True, height=250, use_container_width=True)
-    st.download_button("Download test-customer rankings", visible.to_csv(index=False, float_format="%.1f"), "churn_rankings.csv", "text/csv", use_container_width=True)
-    st.markdown("#### What influenced an individual prediction?")
+    st.download_button("Download rankings", visible.to_csv(index=False, float_format="%.1f"), "churn_rankings.csv", "text/csv", use_container_width=True)
     ids = ranked.customerID.tolist()
     previous = st.session_state.get("selected_customer")
     if st.session_state.get("customer") not in ids:
@@ -187,33 +139,38 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
     selected = st.selectbox("Customer", ids, key="customer")
     st.session_state["selected_customer"] = selected
     record = ranked.loc[ranked.customerID == selected].iloc[0]
-    st.metric("This customer's estimated churn risk", f"{record.risk_score:.1%}")
+    st.metric("Estimated churn risk", f"{record.risk_score:.1%}")
     try:
         reasons = cached_explanation(content, int(record.row_index))
         draw(charts.shap_chart(reasons))
-        up = reasons.loc[reasons.Contribution > 1e-8]
-        down = reasons.loc[reasons.Contribution < -1e-8]
-        a, b = st.columns(2)
-        with a:
-            st.markdown("**Strongest upward influence**")
-            st.write(f"{charts.feature_name(up.iloc[0].Feature)} = {up.iloc[0].Value}" if not up.empty else "No feature pushes the score up relative to this reference.")
-        with b:
-            st.markdown("**Strongest downward influence**")
-            st.write(f"{charts.feature_name(down.iloc[0].Feature)} = {down.iloc[0].Value}" if not down.empty else "No feature pushes the score down relative to this reference.")
-        st.write("Read from the zero line: coral bars push the model's risk estimate up; teal bars push it down. Longer bars have more influence on this prediction.")
-        caption("SHAP shares the model score among inputs relative to a reference. Bar lengths use log-odds, the model's internal score scale, not percentage-point changes in probability. These are model patterns, not proven causes.")
-        with st.expander("All contributions and customer inputs"):
+        caption("Coral pushes the model score up; teal pushes it down. Bar length shows influence, not a probability change or proven cause.")
+        top = reasons.iloc[0]
+        if abs(float(top.Contribution)) > 1e-8:
+            direction = "up" if top.Contribution > 0 else "down"
+            st.write(f"Strongest influence: **{charts.feature_name(top.Feature)} = {top.Value}**, pushing the score {direction}.")
+        with st.expander("Customer details and all influences"):
             st.dataframe(reasons.round({"Contribution": 3}), hide_index=True, use_container_width=True)
             st.dataframe(bundle["X"].iloc[[int(record.row_index)]], hide_index=True, use_container_width=True)
-            st.markdown(f"[How to interpret SHAP]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md#individual-risk)")
+            st.markdown(f"[How SHAP explanations work]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md#individual-risk)")
     except Exception:
         logging.exception("SHAP explanation failed")
-        st.warning("We could not calculate this explanation. The rankings and retention scenario remain available.")
+        st.warning("This explanation is unavailable. Rankings and campaign calculations still work.")
+    with st.expander("Check the risk ranking"):
+        draw(charts.distribution_chart(ranked))
+        caption("Customers in each 10-point risk range. Probability calibration has not been established.")
+        draw(charts.capture_chart(charts.capture_summary(ranked, bundle["y"])))
+        count = int(np.ceil(len(ranked) * 0.2))
+        truth = bundle["y"]
+        total = int(truth.iloc[ranked.row_index].sum())
+        found = int(truth.iloc[ranked.head(count).row_index].sum())
+        if total:
+            st.write(f"The top 20% contain {found / total:.1%} of actual test churners. Random selection would find about 20% on average.")
+        caption("This measures historical ranking quality, not whether offers prevent churn.")
 
 
 def campaign_view(ranked: pd.DataFrame) -> None:
-    st.subheader("Would a retention offer be worth its cost?")
-    st.write("Choose a campaign size and assumptions. The app estimates what could happen; the data does not tell us how effective an offer would be.")
+    st.subheader("Retention scenario")
+    caption("Set costs and an assumed offer effect. Use the same currency for both amounts.")
     settings = st.session_state.setdefault("campaign_settings", {"cost": 20.0, "value": 500.0, "share": 20, "success": 15})
     for widget_key, setting in [("offer_cost", "cost"), ("customer_value", "value"), ("contact_share", "share"), ("offer_success", "success")]:
         if widget_key not in st.session_state:
@@ -227,35 +184,35 @@ def campaign_view(ranked: pd.DataFrame) -> None:
         st.info("Enter an offer cost and customer value to calculate the scenario.")
         return
     settings.update(cost=cost, value=value, share=share, success=success)
-    caption("Example: a 15% success rate assumes the offer prevents churn for 15 out of 100 contacted customers who would otherwise leave. This rate is assumed, not learned.")
+    caption("Offer success means the share of would-be churners the offer prevents from leaving. It is an assumption.")
     savings = estimate_savings(ranked, share, cost, value, success / 100)
     a, b, c = st.columns(3)
     a.metric("Customers contacted", f"{savings['contacted']:,}")
     b.metric("Expected customers retained", f"{savings['expected_retained']:.1f}")
     c.metric("Scenario net savings", f"{savings['net_savings']:,.2f}")
-    a, b = st.columns(2)
-    with a:
-        st.markdown("#### Where the money comes from")
+    draw(charts.savings_curve_chart(charts.campaign_curve(ranked, cost, value, success / 100), share))
+    caption("The dot marks your contact share. Above zero = estimated gain; below zero = estimated loss.")
+    rate = savings["break_even_success_rate"]
+    if savings["contacted"] == 0:
+        st.info("No customers selected. Costs and savings are zero.")
+    elif not np.isfinite(rate) and savings["offer_spend"] == 0:
+        st.info("No modeled benefit or offer spend: net savings are zero.")
+    elif not np.isfinite(rate) or rate > 1:
+        st.info("These costs cannot be recovered even if every expected churner is retained.")
+    else:
+        st.write(f"**Break-even offer success: {rate:.1%}.** Your assumption: {success}%.")
+    caption("Scenario only: offer effectiveness is unmeasured and risk probabilities are not fully calibrated.")
+    with st.expander("Cost breakdown and calculation"):
         draw(charts.money_chart(savings))
-        st.write(f"Avoided loss of **{savings['avoided_loss']:,.2f}**, minus offer spend of **{savings['offer_spend']:,.2f}**, gives net savings of **{savings['net_savings']:,.2f}** in your chosen currency.")
-    with b:
-        st.markdown("#### What if you contacted more customers?")
-        draw(charts.savings_curve_chart(charts.campaign_curve(ranked, cost, value, success / 100), share))
-        st.write("The dot marks your chosen contact share. Above the dashed zero line means positive scenario savings; below it means offer costs exceed the estimated benefit.")
-        caption("All points use the same cost, value, and assumed success rate. The curve explores assumptions; its highest point is not a validated campaign recommendation.")
-    st.warning("Estimated savings depend on both the model probabilities and your success assumption. A randomized campaign is needed to measure whether the offer actually reduces churn.")
-    with st.expander("Calculation and assumptions"):
-        st.write("Expected retained customers = sum of contacted customers' risk scores × assumed success rate.\n\nNet savings = expected retained customers × customer value − contacted customers × offer cost.")
-        st.write("A fractional retained-customer count is an average expected across similar campaigns, not part of a person. Customer value and offer cost must use one currency and a consistent period.")
-        st.markdown(f"[Full savings method]({REPO}/blob/main/docs/METHODOLOGY.md#retention-scenario)")
+        st.write(f"Avoided loss {savings['avoided_loss']:,.2f} − offer spend {savings['offer_spend']:,.2f} = net savings {savings['net_savings']:,.2f}.")
+        st.write("Expected retained customers = sum of contacted risk scores × assumed offer success. Costs apply to every contacted customer.")
+        st.markdown(f"[Assumptions and savings formula]({REPO}/blob/main/docs/METHODOLOGY.md#retention-scenario)")
 
 
 def main() -> None:
     apply_layout()
     if has_customer_data():
-        st.caption("CUSTOMER RETENTION / PREDICTION & PLANNING")
-        st.title("Understand customer churn")
-        st.write("See who may leave, understand the model's reasons, and explore the cost of acting.")
+        st.title("Customer churn")
         content, label = load_input()
     else:
         with st.container(key="landing_start"):
@@ -272,15 +229,8 @@ def main() -> None:
         bundle = cached_training(content)
     if "SYNTHETIC" in label:
         st.warning("The public download was unavailable. You are viewing fictional offline data, not the Telco dataset.")
-    caption(label + " · Historical evaluation · No offer effects have been measured")
-    with st.container(key="summary_metrics"):
-        a, b, c, d = st.columns(4)
-        a.metric("Historical customers", f"{len(bundle['X']):,}")
-        b.metric("Observed churn", f"{bundle['y'].mean():.1%}")
-        c.metric("Test customers", f"{len(bundle['result']['test_idx']):,}")
-        d.metric("Selected model", bundle["result"]["winner"])
+    caption(f"{label} · {len(bundle['X']):,} customers · {bundle['y'].mean():.1%} left · {len(bundle['result']['test_idx']):,} held out for testing")
     section = select_section()
-    caption("Choose a section above. Charts and controls adapt to your screen; detailed explanations are linked below.")
     ranked = rank_customers(bundle["result"], bundle["X"], bundle["ids"])
     if section == "Customers":
         customers_view(bundle)
@@ -291,8 +241,7 @@ def main() -> None:
     else:
         campaign_view(ranked)
     st.divider()
-    caption("Predictions describe patterns, not causes. Changing an input does not prove a customer will stay.")
-    st.markdown(f"[Read the dashboard guide]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md) · [Methodology]({REPO}/blob/main/docs/METHODOLOGY.md) · [Source code]({REPO})")
+    st.markdown(f"[Guide and methodology]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md) · [Source code]({REPO})")
 
 
 if __name__ == "__main__":

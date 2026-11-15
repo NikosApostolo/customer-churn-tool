@@ -81,24 +81,29 @@ def feature_summary(X: pd.DataFrame, y: pd.Series, feature: str) -> pd.DataFrame
 
 
 def feature_chart(summary: pd.DataFrame) -> alt.Chart:
-    chart = alt.Chart(summary).mark_bar(color=TEAL, cornerRadiusEnd=4).encode(
-        y=alt.Y("Group:N", title=None, sort=alt.SortField(field="Order"), axis=alt.Axis(labelLimit=240)),
+    base = alt.Chart(summary).encode(
+        y=alt.Y("Group:N", title=None, sort=alt.SortField(field="Order"), axis=alt.Axis(labelLimit=125)),
         x=alt.X("Churn rate:Q", title="Customers who left", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
         tooltip=["Group", alt.Tooltip("Churn rate:Q", format=".1%"), "Customers"],
     )
-    return finish(chart, max(200, min(400, len(summary) * 35)))
+    bars = base.mark_bar(color=TEAL, cornerRadiusEnd=4)
+    inside = base.transform_filter(alt.datum["Churn rate"] >= 0.18).mark_text(align="right", dx=-6, color="white", fontSize=12).encode(text=alt.Text("Churn rate:Q", format=".1%"))
+    outside = base.transform_filter(alt.datum["Churn rate"] < 0.18).mark_text(align="left", dx=6, color="#34445A", fontSize=12).encode(text=alt.Text("Churn rate:Q", format=".1%"))
+    return finish(bars + inside + outside, max(200, min(400, len(summary) * 35)))
 
 
 def comparison_chart(metrics: pd.DataFrame) -> alt.Chart:
     frame = metrics.melt(id_vars="Model", value_vars=["Test precision", "Test recall"], var_name="Metric", value_name="Score")
     frame["Metric"] = frame.Metric.str.replace("Test ", "", regex=False).str.capitalize()
-    chart = alt.Chart(frame).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+    base = alt.Chart(frame).encode(
         x=alt.X("Metric:N", title=None, axis=alt.Axis(labelAngle=0)),
         xOffset="Model:N", y=alt.Y("Score:Q", title="Share of customers", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
         color=alt.Color("Model:N", scale=MODEL_COLORS),
         tooltip=["Model", "Metric", alt.Tooltip("Score:Q", format=".1%")],
     )
-    return finish(chart)
+    bars = base.mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+    labels = base.mark_text(dy=-8, fontSize=12, color="#34445A").encode(text=alt.Text("Score:Q", format=".0%"))
+    return finish(bars + labels)
 
 
 def pr_chart(truth: pd.Series, scores: dict[str, np.ndarray]) -> alt.Chart:
@@ -161,12 +166,12 @@ def capture_chart(summary: pd.DataFrame) -> alt.Chart:
 
 
 def shap_chart(reasons: pd.DataFrame) -> alt.Chart:
-    frame = reasons.head(7).copy()
+    frame = reasons.head(5).copy()
     frame["Input"] = frame.Feature.map(feature_name)
     frame["Direction"] = np.where(frame.Contribution >= 0, "Pushes risk up", "Pushes risk down")
     chart = alt.Chart(frame).mark_bar(cornerRadius=4).encode(
         y=alt.Y("Input:N", sort=frame.Input.tolist(), title=None, axis=alt.Axis(labelLimit=125, labelFontSize=11)),
-        x=alt.X("Contribution:Q", title=["Contribution to model score", "(log-odds)"]),
+        x=alt.X("Contribution:Q", title="Influence on model score"),
         color=alt.Color("Direction:N", scale=alt.Scale(domain=["Pushes risk up", "Pushes risk down"], range=[CORAL, TEAL])),
         tooltip=["Feature", "Value", "Direction", alt.Tooltip("Contribution:Q", format=".3f")],
     )

@@ -60,7 +60,7 @@ Brier score is the mean squared difference between predicted probabilities and o
 
 Logistic regression is explained with SHAP LinearExplainer, using up to 100 training customers as its background. XGBoost is explained with TreeExplainer in raw-output mode, using its tree-path reference.
 
-Both explainers return contributions in log-odds units. Contributions from one-hot indicators are summed into their original feature, so users see Contract rather than several encoded contract columns. The chart displays the seven largest absolute contributions, and the table includes all features.
+Both explainers return contributions in log-odds units. Contributions from one-hot indicators are summed into their original feature, so users see Contract rather than several encoded contract columns. The chart displays the five largest absolute contributions, and the table includes all features.
 
 The explanations describe why a model assigns its score relative to its reference. They do not identify proven causes of churn. Different models or references can distribute contributions differently, especially when inputs are correlated.
 

@@ -126,3 +126,8 @@ Uploads require supported Telco-style columns and known historical churn outcome
 - [Telco Customer Churn on Kaggle](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
 
 **Author:** Nikolaos Apostolopoulos
+
+
+## Interface
+
+The main views focus on customer outcomes, model comparison, individual explanations, and retention scenarios. Supporting charts and technical details are expandable. The retention view includes the success assumption needed to break even. Detailed chart interpretation is in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).

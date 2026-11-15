@@ -1,5 +1,7 @@
 # Reading the dashboard
 
+The main screens show the essential results. Expand **Data checks**, **Detailed evaluation**, **Check the risk ranking**, or **Cost breakdown and calculation** for supporting charts and exact values. The descriptions below explain both the main and expandable views.
+
 The dashboard separates four questions: what the historical data contains, how well the models predict, which customers receive high scores, and what a retention campaign could cost. Use the **Explore the dashboard** selector to visit those sections in that order on a first visit.
 
 The sample comes from IBM's Telco Customer Churn dataset. An upload must contain historical churn outcomes and supported Telco-style inputs. This version does not score a separate unlabeled future-customer file.
@@ -86,7 +88,7 @@ The table is sorted from highest to lowest estimated churn risk. Scores are disp
 
 ### Individual explanation
 
-Select a customer to see the score and the seven largest SHAP contributions. The chart combines encoded category columns back into their original input fields. Axis labels show readable field names; exact values appear in the chart details, the upward/downward summaries, and the expandable customer-input table.
+Select a customer to see the score and the five largest SHAP contributions. The chart combines encoded category columns back into their original input fields. Axis labels show readable field names; exact values appear in the chart details, the upward/downward summaries, and the expandable customer-input table.
 
 - Coral bars push the model score up relative to the explanation's reference.
 - Teal bars push the score down.
@@ -142,3 +144,8 @@ The group-rate table, model counts, customer summaries, and expandable SHAP valu
 Campaign settings and the selected customer persist while moving between sections in the current session. Upload data is temporary; a server restart can clear it.
 
 The live layout was checked in Chrome at 340, 454, 681, and 1,363 CSS-pixel viewport widths, including section changes, input sizes, chart bounds, and campaign recalculation. These responsive browser-width checks do not replace testing every physical phone, operating system, and browser. Rendering and file-picker behavior can differ, particularly between Safari and Chrome.
+
+
+### Campaign break-even point
+
+The retention section also shows the assumed offer success rate needed for the chosen campaign to cover its costs: offer spend divided by the sum of contacted risk scores times customer value. A lower assumed success rate implies a modeled loss. This is a break-even calculation under the model's probability estimates, not evidence about actual offer effectiveness.
