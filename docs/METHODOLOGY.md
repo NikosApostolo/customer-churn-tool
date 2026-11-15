@@ -1,5 +1,7 @@
 # Methodology
 
+For equations, derivations, and worked examples, see [Mathematical modelling](MATHEMATICAL_MODELLING.md).
+
 For chart-by-chart explanations and examples, see [Reading the dashboard](READING_THE_DASHBOARD.md).
 
 ## Input data
@@ -112,4 +114,4 @@ The capture curve cumulatively counts actual test churners in descending risk or
 
 The precision–recall chart varies the decision threshold for display only. Neither this curve nor the test capture curve changes model selection or the fixed 0.50 classification threshold. Large precision–recall displays are limited to 2,000 points per model, retaining endpoints; scores and metrics always use all observations.
 
-The four-tab layout separates exploration, evaluation, individual explanations, and business assumptions. Expandable sections retain exact scores and technical details without making raw tables the main interface. The visual redesign does not change model settings, the data split, or the measured Telco results above.
+The four-section layout separates exploration, evaluation, individual explanations, and business assumptions. Expandable sections retain exact scores and technical details without making raw tables the main interface. The visual redesign does not change model settings, the data split, or the measured Telco results above.

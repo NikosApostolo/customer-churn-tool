@@ -45,7 +45,7 @@ Logistic regression provides a simple baseline. XGBoost captures more complex re
 
 SHAP explanations work with either selected model. The chart groups contributions into the original customer fields, such as contract type and tenure. Positive contributions increase the model score; negative contributions decrease it. These contributions use log-odds, the model's internal score scale, rather than percentage-point changes in probability.
 
-See [Methodology](docs/METHODOLOGY.md) for the input requirements, processing steps, explanation method, and savings formula.
+See [Methodology](docs/METHODOLOGY.md) for the implementation details and [Mathematical modelling](docs/MATHEMATICAL_MODELLING.md) for the equations behind preprocessing, both models, evaluation, SHAP, and retention scenarios.
 
 ## Results
 
@@ -105,6 +105,7 @@ The project was checked on Python 3.12.14 on Linux, with 21 tests passing. Check
 | `src/charts.py` | Interactive charts and visual summaries |
 | `src/layout.py`, `src/styles.css` | Responsive layout, section navigation, and touch-friendly controls |
 | `tests/test_basic.py` | Automated checks |
+| `docs/MATHEMATICAL_MODELLING.md` | Equations, derivations, and worked examples |
 | `docs/METHODOLOGY.md` | Data requirements and implementation details |
 | `docs/READING_THE_DASHBOARD.md` | Chart interpretation, examples, and caveats |
 | `.streamlit/config.toml` | Consistent light theme and upload limit |
