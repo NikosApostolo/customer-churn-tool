@@ -14,7 +14,7 @@ from src.model import rank_customers, train_models
 from src.layout import apply_layout, select_section, has_customer_data, landing_intro, landing_features
 
 REPO = "https://github.com/NikosApostolo/customer-churn-tool"
-st.set_page_config(page_title="Customer Churn | Retention dashboard", page_icon="◉", layout="wide")
+st.set_page_config(page_title="Customer Churn", page_icon="◉", layout="wide")
 
 
 @st.cache_data(ttl=3600, max_entries=2, show_spinner=False)
