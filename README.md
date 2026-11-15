@@ -8,9 +8,9 @@ The app compares logistic regression with XGBoost, explains individual predictio
 
 ## Dashboard preview
 
-![Welcome screen and project contribution](docs/images/welcome.jpg)
+![Welcome screen](docs/images/welcome.jpg)
 
-![Customer overview](docs/images/overview.jpg)
+![Model comparison](docs/images/overview.jpg)
 
 ## Project contribution
 
