@@ -11,6 +11,7 @@ from src.business import estimate_savings
 from src.data import clean_data, load_sample, read_csv_bytes
 from src.explain import explain_customer
 from src.model import rank_customers, train_models
+from src.layout import apply_layout, select_section
 
 REPO = "https://github.com/NikosApostolo/customer-churn-tool"
 st.set_page_config(page_title="Customer Churn | Retention dashboard", page_icon="◉", layout="wide")
@@ -45,9 +46,10 @@ def caption(text: str) -> None:
 
 
 def load_input() -> tuple[bytes | None, str]:
-    with st.sidebar:
-        st.markdown("### Data source")
-        source = st.radio("Choose data", ["Sample data", "Upload CSV"], label_visibility="collapsed")
+    # Keep loading controls on the page: a phone user should not need a sidebar.
+    loaded = "sample_content" in st.session_state or st.session_state.get("input_source") == "Upload CSV"
+    with st.expander("Choose or change customer data", expanded=not loaded):
+        source = st.radio("Choose data", ["Sample data", "Upload CSV"], key="input_source")
         if source == "Sample data":
             if st.button("Use sample data", type="primary", use_container_width=True):
                 with st.spinner("Loading customers…"):
@@ -57,13 +59,9 @@ def load_input() -> tuple[bytes | None, str]:
             content = st.session_state.get("sample_content")
             label = st.session_state.get("sample_label", "IBM Telco sample")
         else:
-            upload = st.file_uploader("Historical customer CSV", type=["csv"])
+            upload = st.file_uploader("Historical customer CSV", type=["csv"], key="customer_upload")
             content = upload.getvalue() if upload is not None else None
             label = "Uploaded customer data"
-        st.divider()
-        st.markdown("### How to read this app")
-        st.write("**1. Customers** — understand the data.\n\n**2. Models** — check prediction quality.\n\n**3. Individual risk** — inspect a customer.\n\n**4. Retention plan** — explore costs and savings.")
-        st.markdown(f"[Project documentation]({REPO}#readme)")
         caption("Use public or fictional data. Uploads are processed on the server and cached in memory for up to 30 minutes.")
     return content, label
 
@@ -88,7 +86,11 @@ def customers_view(bundle: dict[str, Any]) -> None:
     feature = st.selectbox("Compare customer groups by", features, index=default, key="group_feature", format_func=charts.feature_name)
     summary = charts.feature_summary(X, y, feature)
     draw(charts.feature_chart(summary))
-    caption("Each bar is the share who left within that group. Hover to see the group size; small groups are less reliable. Numeric inputs are divided into six equal-width ranges. These are associations across the uploaded data, not proof of causes.")
+    caption("Each bar is the share who left within that group. Tap or hover for details, or open the values below. Small groups are less reliable. Numeric inputs are divided into six equal-width ranges. These are associations across the uploaded data, not proof of causes.")
+    with st.expander("Group rates and customer counts"):
+        values = summary[["Group", "Customers", "Churn rate"]].copy()
+        values["Churn rate"] = values["Churn rate"].map(lambda rate: f"{rate:.1%}")
+        st.dataframe(values, hide_index=True, use_container_width=True)
     with st.expander("Cleaning notes and supported CSV format"):
         for note in bundle["notes"]:
             st.write(note)
@@ -162,12 +164,15 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
     visible = ranked[["customerID", "risk_score"]].copy()
     visible["risk_percent"] = (visible.pop("risk_score").astype(float) * 100).round(1)
     st.dataframe(visible, column_config={
-        "customerID": st.column_config.TextColumn("Customer"),
-        "risk_percent": st.column_config.ProgressColumn("Estimated churn risk", format="%.1f%%", min_value=0, max_value=100),
+        "customerID": st.column_config.TextColumn("Customer", width="small"),
+        "risk_percent": st.column_config.ProgressColumn("Risk", width="small", format="%.1f%%", min_value=0, max_value=100),
     }, hide_index=True, height=250, use_container_width=True)
-    st.download_button("Download test-customer rankings", visible.to_csv(index=False, float_format="%.1f"), "churn_rankings.csv", "text/csv")
+    st.download_button("Download test-customer rankings", visible.to_csv(index=False, float_format="%.1f"), "churn_rankings.csv", "text/csv", use_container_width=True)
     st.markdown("#### What influenced an individual prediction?")
-    selected = st.selectbox("Customer", ranked.customerID.tolist(), key="customer")
+    ids = ranked.customerID.tolist()
+    previous = st.session_state.get("selected_customer")
+    selected = st.selectbox("Customer", ids, index=ids.index(previous) if previous in ids else 0, key="customer")
+    st.session_state["selected_customer"] = selected
     record = ranked.loc[ranked.customerID == selected].iloc[0]
     st.metric("This customer's estimated churn risk", f"{record.risk_score:.1%}")
     try:
@@ -196,11 +201,13 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
 def campaign_view(ranked: pd.DataFrame) -> None:
     st.subheader("Would a retention offer be worth its cost?")
     st.write("Choose a campaign size and assumptions. The app estimates what could happen; the data does not tell us how effective an offer would be.")
+    settings = st.session_state.setdefault("campaign_settings", {"cost": 20.0, "value": 500.0, "share": 20, "success": 15})
     a, b = st.columns(2)
-    cost = a.number_input("Offer cost per contacted customer", min_value=0.0, value=20.0, step=1.0, help="Assume this cost is paid for everyone contacted.")
-    value = b.number_input("Value of a lost customer", min_value=0.0, value=500.0, step=10.0, help="Use lost profit or contribution over one defined period, in the same currency as the offer cost.")
-    share = st.slider("Contact the top X% by risk", 0, 100, 20)
-    success = st.slider("Assumed share of would-be churners saved by the offer (%)", 0, 100, 15)
+    cost = a.number_input("Offer cost per contacted customer", min_value=0.0, value=settings["cost"], step=1.0, key="offer_cost", help="Assume this cost is paid for everyone contacted.")
+    value = b.number_input("Value of a lost customer", min_value=0.0, value=settings["value"], step=10.0, key="customer_value", help="Use lost profit or contribution over one defined period, in the same currency as the offer cost.")
+    share = st.slider("Contact the top X% by risk", 0, 100, settings["share"], key="contact_share")
+    success = st.slider("Assumed share of would-be churners saved by the offer (%)", 0, 100, settings["success"], key="offer_success")
+    settings.update(cost=cost, value=value, share=share, success=success)
     caption("Example: a 15% success rate assumes the offer prevents churn for 15 out of 100 contacted customers who would otherwise leave. This rate is assumed, not learned.")
     savings = estimate_savings(ranked, share, cost, value, success / 100)
     a, b, c = st.columns(3)
@@ -225,20 +232,13 @@ def campaign_view(ranked: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    st.markdown("""<style>
-    .block-container {max-width:1280px;padding-top:2.5rem;padding-bottom:3rem;}
-    h1,h2,h3 {letter-spacing:-0.025em;}
-    [data-testid="stMetric"] {background:#F3F7FA;border:1px solid #E3EAF0;border-radius:12px;padding:16px;}
-    [data-testid="stMetricLabel"] {color:#526174;}
-    [data-testid="stSidebar"] {background:#F4F7FA;}
-    .stTabs [data-baseweb="tab-list"] {gap:18px;}
-    </style>""", unsafe_allow_html=True)
+    apply_layout()
     st.caption("CUSTOMER RETENTION / PREDICTION & PLANNING")
     st.title("Understand customer churn")
     st.write("See who may leave, understand the model's reasons, and explore the cost of acting.")
     content, label = load_input()
     if content is None:
-        st.info("Start with **Use sample data** in the sidebar, or upload a historical customer CSV.")
+        st.info("Open **Choose or change customer data** above, then load the sample or upload a historical CSV.")
         a, b, c = st.columns(3)
         a.markdown("### Understand\nSee the customer mix and where churn differs.")
         b.markdown("### Evaluate\nCompare two models using unseen customers.")
@@ -250,21 +250,22 @@ def main() -> None:
     if "SYNTHETIC" in label:
         st.warning("The public download was unavailable. You are viewing fictional offline data, not the Telco dataset.")
     caption(label + " · Historical evaluation · No offer effects have been measured")
-    a, b, c, d = st.columns(4)
-    a.metric("Historical customers", f"{len(bundle['X']):,}")
-    b.metric("Observed churn", f"{bundle['y'].mean():.1%}")
-    c.metric("Test customers", f"{len(bundle['result']['test_idx']):,}")
-    d.metric("Selected model", bundle["result"]["winner"])
-    st.write("**How to use it:** explore the four tabs below. Detailed explanations are linked throughout and collected in the GitHub documentation.")
+    with st.container(key="summary_metrics"):
+        a, b, c, d = st.columns(4)
+        a.metric("Historical customers", f"{len(bundle['X']):,}")
+        b.metric("Observed churn", f"{bundle['y'].mean():.1%}")
+        c.metric("Test customers", f"{len(bundle['result']['test_idx']):,}")
+        d.metric("Selected model", bundle["result"]["winner"])
+    section = select_section()
+    caption("Choose a section above. Charts and controls adapt to your screen; detailed explanations are linked below.")
     ranked = rank_customers(bundle["result"], bundle["X"], bundle["ids"])
-    tabs = st.tabs(["01 · Customers", "02 · Models", "03 · Individual risk", "04 · Retention plan"])
-    with tabs[0]:
+    if section == "Customers":
         customers_view(bundle)
-    with tabs[1]:
+    elif section == "Models":
         models_view(bundle)
-    with tabs[2]:
+    elif section == "Individual risk":
         risk_view(bundle, content, ranked)
-    with tabs[3]:
+    else:
         campaign_view(ranked)
     st.divider()
     caption("Predictions describe patterns, not causes. Changing an input does not prove a customer will stay.")

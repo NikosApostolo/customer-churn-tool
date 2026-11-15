@@ -22,16 +22,16 @@ This project connects those steps in one interface. Users can compare models, in
 
 ## Using the app
 
-Choose **Use sample data** in the sidebar, or upload a compatible historical CSV. The dashboard is organized into four tabs:
+Open **Choose or change customer data** to load the sample or upload a compatible historical CSV. Use **Explore the dashboard** to move between four sections:
 
-| Tab | What it shows | Question it answers |
+| Section | What it shows | Question it answers |
 |---|---|---|
 | Customers | Outcome counts, missing values, churn within groups | What does the historical data contain? |
 | Models | Precision/recall bars, precision–recall curves, a confusion-matrix heatmap | How useful are the predictions, and where are the mistakes? |
 | Individual risk | Score distribution, a churn-capture curve, a ranked list, individual SHAP bars | Who receives high scores, and which inputs influence them? |
 | Retention plan | Cost/benefit bars and savings across campaign sizes | What could contacting these customers cost or save? |
 
-Charts include hover details, labeled axes, and short explanations. Detailed interpretation, worked examples, and caveats are in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
+Charts include labeled axes, short explanations, and tap/hover details. On narrow screens, charts and controls stack vertically, summary cards use two columns, and navigation uses a full-width section selector. Customer group counts are also available in an expandable table. Campaign inputs and the selected customer are preserved when switching sections. Detailed interpretation, worked examples, and caveats are in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
 
 The app downloads the sample automatically. If the download fails, it uses clearly labeled fictional data so the interface remains usable.
 
@@ -105,6 +105,7 @@ The project was checked on Python 3.12.14 on Linux, with 21 tests passing. Check
 | `src/explain.py` | Individual SHAP explanations |
 | `src/business.py` | Retention scenario calculations |
 | `src/charts.py` | Interactive charts and visual summaries |
+| `src/layout.py`, `src/styles.css` | Responsive layout, section navigation, and touch-friendly controls |
 | `tests/test_basic.py` | Automated checks |
 | `docs/METHODOLOGY.md` | Data requirements and implementation details |
 | `docs/READING_THE_DASHBOARD.md` | Chart interpretation, examples, and caveats |

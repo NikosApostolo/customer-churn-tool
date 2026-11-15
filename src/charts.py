@@ -30,8 +30,8 @@ MODEL_COLORS = alt.Scale(domain=["Logistic regression", "XGBoost"], range=[BLUE,
 
 def finish(chart: alt.Chart, height: int = 270) -> alt.Chart:
     """Apply a consistent readable style without changing global settings."""
-    return chart.properties(height=height).configure_view(stroke=None).configure_axis(
-        labelFontSize=12, titleFontSize=12, titlePadding=12, gridColor="#EEF1F5",
+    return chart.properties(height=height, padding={"left": 0, "right": 6, "top": 8, "bottom": 0}).configure_view(stroke=None).configure_axis(
+        labelFontSize=12, titleFontSize=12, titlePadding=10, tickCount=4, gridColor="#EEF1F5",
         domain=False, tickColor="#D5DCE5", labelColor="#526174", titleColor="#34445A",
     ).configure_legend(title=None, labelFontSize=12, orient="bottom")
 
@@ -57,7 +57,7 @@ def missing_chart(X: pd.DataFrame) -> alt.Chart:
     if values.empty:
         values = pd.DataFrame({"Feature": ["No missing feature values"], "Missing": [0]})
     chart = alt.Chart(values).mark_bar(color=CORAL, cornerRadiusEnd=4).encode(
-        y=alt.Y("Feature:N", sort="-x", title=None), x=alt.X("Missing:Q", title="Values to fill using training data"),
+        y=alt.Y("Feature:N", sort="-x", title=None), x=alt.X("Missing:Q", title=["Values to fill", "using training data"]),
         tooltip=["Feature", "Missing"],
     )
     return finish(chart, max(130, min(330, len(values) * 30)))
@@ -111,8 +111,8 @@ def pr_chart(truth: pd.Series, scores: dict[str, np.ndarray]) -> alt.Chart:
     if len(frame) > 4000:
         frame = pd.concat([g.iloc[np.unique(np.linspace(0, len(g) - 1, 2000).astype(int))] for _, g in frame.groupby("Model")])
     lines = alt.Chart(frame).mark_line(strokeWidth=2.5).encode(
-        x=alt.X("Recall:Q", title="Actual churners found (recall)", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
-        y=alt.Y("Precision:Q", title="Correct churn flags (precision)", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
+        x=alt.X("Recall:Q", title=["Actual churners found", "(recall)"], axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
+        y=alt.Y("Precision:Q", title=["Correct churn flags", "(precision)"], axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
         color=alt.Color("Model:N", scale=MODEL_COLORS), order="Order:Q",
         tooltip=["Model", alt.Tooltip("Recall:Q", format=".1%"), alt.Tooltip("Precision:Q", format=".1%")],
     )
@@ -152,7 +152,7 @@ def capture_summary(ranked: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
 
 def capture_chart(summary: pd.DataFrame) -> alt.Chart:
     line = alt.Chart(summary).mark_line(color=TEAL, strokeWidth=3).encode(
-        x=alt.X("Contact share:Q", title="Highest-risk share of test customers", axis=alt.Axis(format="%")),
+        x=alt.X("Contact share:Q", title=["Highest-risk share", "of test customers"], axis=alt.Axis(format="%")),
         y=alt.Y("Churners found:Q", title="Actual churners included", axis=alt.Axis(format="%"), scale=alt.Scale(domain=[0, 1])),
         tooltip=[alt.Tooltip("Contact share:Q", format=".1%"), alt.Tooltip("Churners found:Q", format=".1%")],
     )
@@ -162,11 +162,11 @@ def capture_chart(summary: pd.DataFrame) -> alt.Chart:
 
 def shap_chart(reasons: pd.DataFrame) -> alt.Chart:
     frame = reasons.head(7).copy()
-    frame["Input"] = frame.Feature.map(feature_name) + " = " + frame.Value.str.slice(0, 28)
+    frame["Input"] = frame.Feature.map(feature_name)
     frame["Direction"] = np.where(frame.Contribution >= 0, "Pushes risk up", "Pushes risk down")
     chart = alt.Chart(frame).mark_bar(cornerRadius=4).encode(
-        y=alt.Y("Input:N", sort=frame.Input.tolist(), title=None, axis=alt.Axis(labelLimit=280)),
-        x=alt.X("Contribution:Q", title="Contribution to the model score (log-odds)"),
+        y=alt.Y("Input:N", sort=frame.Input.tolist(), title=None, axis=alt.Axis(labelLimit=125, labelFontSize=11)),
+        x=alt.X("Contribution:Q", title=["Contribution to model score", "(log-odds)"]),
         color=alt.Color("Direction:N", scale=alt.Scale(domain=["Pushes risk up", "Pushes risk down"], range=[CORAL, TEAL])),
         tooltip=["Feature", "Value", "Direction", alt.Tooltip("Contribution:Q", format=".3f")],
     )
@@ -184,8 +184,8 @@ def campaign_curve(ranked: pd.DataFrame, cost: float, value: float, success: flo
 
 def savings_curve_chart(curve: pd.DataFrame, share: int) -> alt.Chart:
     base = alt.Chart(curve).encode(
-        x=alt.X("Contact share:Q", title="Highest-risk customers contacted (%)", scale=alt.Scale(domain=[0, 100])),
-        y=alt.Y("Net savings:Q", title="Scenario net savings (chosen currency)"),
+        x=alt.X("Contact share:Q", title=["Highest-risk customers", "contacted (%)"], scale=alt.Scale(domain=[0, 100])),
+        y=alt.Y("Net savings:Q", title=["Scenario net savings", "(chosen currency)"]),
         tooltip=[alt.Tooltip("Contact share:Q", title="Contacted (%)"), alt.Tooltip("Net savings:Q", format=",.2f")],
     )
     line = base.mark_line(color=TEAL, strokeWidth=3)
@@ -197,7 +197,7 @@ def savings_curve_chart(curve: pd.DataFrame, share: int) -> alt.Chart:
 def money_chart(savings: dict) -> alt.Chart:
     frame = pd.DataFrame({"Item": ["Avoided loss", "Offer spend", "Net savings"], "Amount": [savings["avoided_loss"], -savings["offer_spend"], savings["net_savings"]]})
     chart = alt.Chart(frame).mark_bar(cornerRadiusEnd=4).encode(
-        y=alt.Y("Item:N", sort=frame.Item.tolist(), title=None), x=alt.X("Amount:Q", title="Amount in your chosen currency"),
+        y=alt.Y("Item:N", sort=frame.Item.tolist(), title=None), x=alt.X("Amount:Q", title=["Amount in your", "chosen currency"]),
         color=alt.condition(alt.datum.Amount >= 0, alt.value(TEAL), alt.value(CORAL)),
         tooltip=["Item", alt.Tooltip("Amount:Q", format=",.2f")],
     )

@@ -92,6 +92,8 @@ def test_streamlit_sample() -> None:
         app.button[0].click().run()
     assert not app.exception
     assert not app.error
+    next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Retention plan").run()
+    assert not app.exception and not app.error
     assert any(metric.label == "Customers contacted" for metric in app.metric)
 
 
@@ -142,13 +144,20 @@ def test_upload_interface_and_cached_controls() -> None:
             app.radio[0].set_value("Upload CSV").run()
             assert not app.exception and not app.error
             assert training.call_count == 1
+            next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Retention plan").run()
             app.slider[0].set_value(0).run()
             assert not app.exception and not app.error
             assert training.call_count == 1
             assert any(m.label == "Scenario net savings" and m.value == "0.00" for m in app.metric)
+            next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Models").run()
+            assert not app.exception and not app.error
+            next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Individual risk").run()
             customer = next(control for control in app.selectbox if control.label == "Customer")
             customer.set_value(customer.options[-1]).run()
             assert not app.exception and not app.error
+            assert training.call_count == 1
+            next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Retention plan").run()
+            assert app.slider[0].value == 0
             assert training.call_count == 1
 
 

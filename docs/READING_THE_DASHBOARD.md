@@ -1,6 +1,6 @@
 # Reading the dashboard
 
-The dashboard separates four questions: what the historical data contains, how well the models predict, which customers receive high scores, and what a retention campaign could cost. Use the tabs in that order on a first visit.
+The dashboard separates four questions: what the historical data contains, how well the models predict, which customers receive high scores, and what a retention campaign could cost. Use the **Explore the dashboard** selector to visit those sections in that order on a first visit.
 
 The sample comes from IBM's Telco Customer Churn dataset. An upload must contain historical churn outcomes and supported Telco-style inputs. This version does not score a separate unlabeled future-customer file.
 
@@ -22,7 +22,7 @@ The app uses training medians for missing numbers and a `missing` category for m
 
 Select an input, such as Contract. Each bar shows the fraction of customers in that group who left. For numerical inputs with more than eight distinct values, the app creates six equal-width ranges and orders them numerically. Missing values form a separate group.
 
-Hover over a bar to check its customer count. A high rate in a group of five people is less reliable than the same rate in a group of hundreds. The chart does not show confidence intervals or establish that differences are statistically significant.
+Tap or hover over a bar to check its customer count, or open **Group rates and customer counts** below it. A high rate in a group of five people is less reliable than the same rate in a group of hundreds. The chart does not show confidence intervals or establish that differences are statistically significant.
 
 These charts explore the full historical dataset. They do not alter the fixed model settings, select features, or select the winning model. Differences between groups are associations, not evidence that changing an input causes someone to stay.
 
@@ -86,7 +86,7 @@ The table is sorted from highest to lowest estimated churn risk. Scores are disp
 
 ### Individual explanation
 
-Select a customer to see the score and the seven largest SHAP contributions. The chart combines encoded category columns back into their original input fields. Labels show the field and its value.
+Select a customer to see the score and the seven largest SHAP contributions. The chart combines encoded category columns back into their original input fields. Axis labels show readable field names; exact values appear in the chart details, the upward/downward summaries, and the expandable customer-input table.
 
 - Coral bars push the model score up relative to the explanation's reference.
 - Teal bars push the score down.
@@ -126,6 +126,19 @@ The dataset contains no retention experiment. A real campaign would need to rand
 
 ## Keeping the display responsive
 
-Models and explanations are cached: unchanged calculations are reused instead of repeated. Moving a campaign slider does not retrain the model. A different input file gets a new calculation unless its result is already cached. The sidebar and each tab keep the data source, population, units, and assumptions visible.
+Models and explanations are cached: unchanged calculations are reused instead of repeated. Moving a campaign slider does not retrain the model. A different input file gets a new calculation unless its result is already cached. The data controls sit on the page rather than inside a sidebar. Only the selected section renders, reducing chart work on small devices. Section changes preserve the campaign assumptions and selected customer.
 
 Detailed implementation: [Methodology](METHODOLOGY.md).
+
+
+## Small-screen use
+
+Open **Choose or change customer data** near the top to load a sample or select a CSV from your device. After loading, use the full-width **Explore the dashboard** selector to switch sections. You do not need to find a hidden sidebar or swipe through a wide tab row.
+
+Charts and form columns stack below 900 CSS pixels. Summary cards form a two-column grid, with wrapping labels and smaller headings on phones. Input text uses a minimum 16px size and controls have generous touch targets. Chart axis titles use shorter or multiple lines, while dense tables retain their own horizontal scrolling.
+
+The group-rate table, model counts, customer summaries, and expandable SHAP values provide alternatives to hover-only details. Download buttons span the available width. CSV selection and download prompts are handled by the device's browser.
+
+Campaign settings and the selected customer persist while moving between sections in the current session. Upload data is temporary; a server restart can clear it.
+
+Responsive browser-width checks do not replace testing every physical phone, operating system, and browser. Rendering and file-picker behavior can differ, particularly between Safari and Chrome.
