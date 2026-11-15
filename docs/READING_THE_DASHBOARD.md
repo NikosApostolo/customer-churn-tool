@@ -141,4 +141,4 @@ The group-rate table, model counts, customer summaries, and expandable SHAP valu
 
 Campaign settings and the selected customer persist while moving between sections in the current session. Upload data is temporary; a server restart can clear it.
 
-Responsive browser-width checks do not replace testing every physical phone, operating system, and browser. Rendering and file-picker behavior can differ, particularly between Safari and Chrome.
+The live layout was checked in Chrome at 340, 454, 681, and 1,363 CSS-pixel viewport widths, including section changes, input sizes, chart bounds, and campaign recalculation. These responsive browser-width checks do not replace testing every physical phone, operating system, and browser. Rendering and file-picker behavior can differ, particularly between Safari and Chrome.

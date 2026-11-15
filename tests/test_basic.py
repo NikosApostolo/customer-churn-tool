@@ -149,6 +149,14 @@ def test_upload_interface_and_cached_controls() -> None:
             assert not app.exception and not app.error
             assert training.call_count == 1
             assert any(m.label == "Scenario net savings" and m.value == "0.00" for m in app.metric)
+            for cost in [25.0, 30.0]:
+                app.number_input[0].set_value(cost).run()
+                assert app.number_input[0].value == cost
+                assert not app.error and not app.exception
+            for share in [30, 40]:
+                app.slider[0].set_value(share).run()
+                assert app.slider[0].value == share
+                assert not app.error and not app.exception
             next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Models").run()
             assert not app.exception and not app.error
             next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Individual risk").run()
@@ -157,7 +165,10 @@ def test_upload_interface_and_cached_controls() -> None:
             assert not app.exception and not app.error
             assert training.call_count == 1
             next(control for control in app.selectbox if control.label == "Explore the dashboard").set_value("Retention plan").run()
-            assert app.slider[0].value == 0
+            assert app.slider[0].value == 40
+            assert app.number_input[0].value == 30.0
+            app.slider[0].set_value(20).run()
+            assert app.slider[0].value == 20
             assert training.call_count == 1
 
 

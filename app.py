@@ -171,7 +171,9 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
     st.markdown("#### What influenced an individual prediction?")
     ids = ranked.customerID.tolist()
     previous = st.session_state.get("selected_customer")
-    selected = st.selectbox("Customer", ids, index=ids.index(previous) if previous in ids else 0, key="customer")
+    if st.session_state.get("customer") not in ids:
+        st.session_state["customer"] = previous if previous in ids else ids[0]
+    selected = st.selectbox("Customer", ids, key="customer")
     st.session_state["selected_customer"] = selected
     record = ranked.loc[ranked.customerID == selected].iloc[0]
     st.metric("This customer's estimated churn risk", f"{record.risk_score:.1%}")
@@ -202,11 +204,17 @@ def campaign_view(ranked: pd.DataFrame) -> None:
     st.subheader("Would a retention offer be worth its cost?")
     st.write("Choose a campaign size and assumptions. The app estimates what could happen; the data does not tell us how effective an offer would be.")
     settings = st.session_state.setdefault("campaign_settings", {"cost": 20.0, "value": 500.0, "share": 20, "success": 15})
+    for widget_key, setting in [("offer_cost", "cost"), ("customer_value", "value"), ("contact_share", "share"), ("offer_success", "success")]:
+        if widget_key not in st.session_state:
+            st.session_state[widget_key] = settings[setting]
     a, b = st.columns(2)
-    cost = a.number_input("Offer cost per contacted customer", min_value=0.0, value=settings["cost"], step=1.0, key="offer_cost", help="Assume this cost is paid for everyone contacted.")
-    value = b.number_input("Value of a lost customer", min_value=0.0, value=settings["value"], step=10.0, key="customer_value", help="Use lost profit or contribution over one defined period, in the same currency as the offer cost.")
-    share = st.slider("Contact the top X% by risk", 0, 100, settings["share"], key="contact_share")
-    success = st.slider("Assumed share of would-be churners saved by the offer (%)", 0, 100, settings["success"], key="offer_success")
+    cost = a.number_input("Offer cost per contacted customer", min_value=0.0, value=None, step=1.0, key="offer_cost", help="Assume this cost is paid for everyone contacted.")
+    value = b.number_input("Value of a lost customer", min_value=0.0, value=None, step=10.0, key="customer_value", help="Use lost profit or contribution over one defined period, in the same currency as the offer cost.")
+    share = st.slider("Contact the top X% by risk", 0, 100, key="contact_share")
+    success = st.slider("Assumed share of would-be churners saved by the offer (%)", 0, 100, key="offer_success")
+    if cost is None or value is None:
+        st.info("Enter an offer cost and customer value to calculate the scenario.")
+        return
     settings.update(cost=cost, value=value, share=share, success=success)
     caption("Example: a 15% success rate assumes the offer prevents churn for 15 out of 100 contacted customers who would otherwise leave. This rate is assumed, not learned.")
     savings = estimate_savings(ranked, share, cost, value, success / 100)
