@@ -133,7 +133,7 @@ Detailed implementation: [Methodology](METHODOLOGY.md).
 
 ## Small-screen use
 
-Open **Choose or change customer data** near the top to load a sample or select a CSV from your device. After loading, use the full-width **Explore the dashboard** selector to switch sections. You do not need to find a hidden sidebar or swipe through a wide tab row.
+On the opening screen, choose **Sample data** or **Upload CSV** in the **Choose your data** panel. After loading, open **Change customer data** near the top to select a different input. After loading, use the full-width **Explore the dashboard** selector to switch sections. You do not need to find a hidden sidebar or swipe through a wide tab row.
 
 Charts and form columns stack below 900 CSS pixels. Summary cards form a two-column grid, with wrapping labels and smaller headings on phones. Input text uses a minimum 16px size and controls have generous touch targets. Chart axis titles use shorter or multiple lines, while dense tables retain their own horizontal scrolling.
 

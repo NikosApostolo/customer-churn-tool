@@ -18,7 +18,7 @@ This project connects those steps in one interface. Users can compare models, in
 
 ## Using the app
 
-Open **Choose or change customer data** to load the sample or upload a compatible historical CSV. Use **Explore the dashboard** to move between four sections:
+The opening screen introduces the project and its prediction → explanation → retention workflow. Choose **Sample data** and click **Use sample data**, or select **Upload CSV**. Once loaded, **Change customer data** lets you switch inputs. Use **Explore the dashboard** to move between four sections:
 
 | Section | What it shows | Question it answers |
 |---|---|---|

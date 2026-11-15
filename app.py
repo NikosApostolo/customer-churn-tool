@@ -11,7 +11,7 @@ from src.business import estimate_savings
 from src.data import clean_data, load_sample, read_csv_bytes
 from src.explain import explain_customer
 from src.model import rank_customers, train_models
-from src.layout import apply_layout, select_section
+from src.layout import apply_layout, select_section, has_customer_data, landing_intro, landing_features
 
 REPO = "https://github.com/NikosApostolo/customer-churn-tool"
 st.set_page_config(page_title="Customer Churn | Retention dashboard", page_icon="◉", layout="wide")
@@ -45,23 +45,34 @@ def caption(text: str) -> None:
     st.caption(text)
 
 
+def select_sample() -> None:
+    """Load before rerendering so the welcome screen becomes the dashboard."""
+    frame, label = cached_sample()
+    st.session_state["sample_content"] = frame.to_csv(index=False).encode("utf-8")
+    st.session_state["sample_label"] = label
+
+
 def load_input() -> tuple[bytes | None, str]:
-    # Keep loading controls on the page: a phone user should not need a sidebar.
-    loaded = "sample_content" in st.session_state or st.session_state.get("input_source") == "Upload CSV"
-    with st.expander("Choose or change customer data", expanded=not loaded):
-        source = st.radio("Choose data", ["Sample data", "Upload CSV"], key="input_source")
+    loaded = has_customer_data()
+    panel = st.expander("Change customer data", expanded=False) if loaded else st.container(border=True, key="data_start")
+    with panel:
+        if not loaded:
+            st.caption("GET STARTED")
+            st.subheader("Choose your data")
+            st.write("Try the built-in example or bring a customer CSV.")
+        source = st.radio("Choose data", ["Sample data", "Upload CSV"], key="input_source", horizontal=True)
         if source == "Sample data":
-            if st.button("Use sample data", type="primary", use_container_width=True):
-                with st.spinner("Loading customers…"):
-                    frame, label = cached_sample()
-                st.session_state["sample_content"] = frame.to_csv(index=False).encode("utf-8")
-                st.session_state["sample_label"] = label
+            if not loaded:
+                st.caption("IBM Telco sample · 7,043 historical customers · No file needed")
+            st.button("Use sample data", type="primary", use_container_width=True, on_click=select_sample)
             content = st.session_state.get("sample_content")
             label = st.session_state.get("sample_label", "IBM Telco sample")
         else:
             upload = st.file_uploader("Historical customer CSV", type=["csv"], key="customer_upload")
             content = upload.getvalue() if upload is not None else None
             label = "Uploaded customer data"
+            if not loaded:
+                st.caption("Include a Churn column with Yes/No or 1/0 historical outcomes. Maximum 10 MB.")
         caption("Use public or fictional data. Uploads are processed on the server and cached in memory for up to 30 minutes.")
     return content, label
 
@@ -241,17 +252,21 @@ def campaign_view(ranked: pd.DataFrame) -> None:
 
 def main() -> None:
     apply_layout()
-    st.caption("CUSTOMER RETENTION / PREDICTION & PLANNING")
-    st.title("Understand customer churn")
-    st.write("See who may leave, understand the model's reasons, and explore the cost of acting.")
-    content, label = load_input()
+    if has_customer_data():
+        st.caption("CUSTOMER RETENTION / PREDICTION & PLANNING")
+        st.title("Understand customer churn")
+        st.write("See who may leave, understand the model's reasons, and explore the cost of acting.")
+        content, label = load_input()
+    else:
+        with st.container(key="landing_start"):
+            intro, start = st.columns([1.15, 1])
+            with intro:
+                landing_intro()
+            with start:
+                content, label = load_input()
+        landing_features()
     if content is None:
-        st.info("Open **Choose or change customer data** above, then load the sample or upload a historical CSV.")
-        a, b, c = st.columns(3)
-        a.markdown("### Understand\nSee the customer mix and where churn differs.")
-        b.markdown("### Evaluate\nCompare two models using unseen customers.")
-        c.markdown("### Plan\nInspect individual risk and retention costs.")
-        st.markdown(f"[About the data, models, and limitations]({REPO}#readme)")
+        st.markdown(f"[Read how the app works]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md) · [Project and methodology]({REPO}#readme)")
         return
     with st.spinner("Preparing the data and comparing models. The first run takes a little longer…"):
         bundle = cached_training(content)
