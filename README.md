@@ -6,6 +6,14 @@ The app compares logistic regression with XGBoost, explains individual predictio
 
 **[Open the live app](https://customer-churn-tool-gupuvojt3rwndamjdgahnv.streamlit.app/)** · [Reading the dashboard](docs/READING_THE_DASHBOARD.md) · [Methodology](docs/METHODOLOGY.md)
 
+## Dashboard preview
+
+![Customer overview](docs/images/overview.jpg)
+
+![Model evaluation](docs/images/models.jpg)
+
+![Retention scenario](docs/images/campaign.jpg)
+
 ## Project contribution
 
 A risk score is only part of a retention decision. Someone using the app also needs to understand the prediction and weigh the cost of acting on it.
