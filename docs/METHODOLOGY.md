@@ -58,6 +58,12 @@ Average precision evaluates ranking quality across thresholds. Its reference lev
 
 Brier score is the mean squared difference between predicted probabilities and observed 0/1 outcomes. It measures probability error but does not, by itself, prove that the probabilities are calibrated. Calibration would mean that customers receiving similar estimated risks churn at approximately those rates over many observations.
 
+## Scoring active customers
+
+Upload labeled historical data first, then use **Score active customers** to upload a second CSV. The second file requires unique customer IDs and all input columns used by the fitted model. Omit `Churn`. Cleaning follows the historical schema and learned preprocessing is reused without fitting again. Scoring rows never enter training, model selection, or historical metrics. The exported `risk_score` is on a 0–1 scale. The demo uses held-out historical customers with outcomes removed and offers a disjoint historical CSV for download.
+
+Campaign calculations can use the scoring list. Capture at the selected contact share is measured on the historical test set as a reference. It cannot establish capture or offer effectiveness for the scoring list.
+
 ## Individual explanations
 
 Logistic regression is explained with SHAP LinearExplainer, using up to 100 training customers as its background. XGBoost is explained with TreeExplainer in raw-output mode, using its tree-path reference.
@@ -103,7 +109,7 @@ The app converts validation failures into readable messages. Unexpected errors a
 
 This is an application of established machine learning methods to a retention workflow. Its practical contribution is connecting model comparison, customer ranking, individual explanations, and campaign assumptions in one interface.
 
-Separate scoring of unlabeled future customers, time-based validation, probability calibration, fairness assessment, campaign experiments, and production access controls remain outside the current implementation.
+Time-based validation, probability calibration, fairness assessment, campaign experiments, and production access controls remain outside the current implementation.
 
 
 ## Visual summaries
@@ -114,4 +120,4 @@ The capture curve cumulatively counts actual test churners in descending risk or
 
 The precision–recall chart varies the decision threshold for display only. Neither this curve nor the test capture curve changes model selection or the fixed 0.50 classification threshold. Large precision–recall displays are limited to 2,000 points per model, retaining endpoints; scores and metrics always use all observations.
 
-The four-section layout separates exploration, evaluation, individual explanations, and business assumptions. Expandable sections retain exact scores and technical details without making raw tables the main interface. The visual redesign does not change model settings, the data split, or the measured Telco results above.
+The dashboard layout separates exploration, evaluation, individual explanations, and business assumptions. Expandable sections retain exact scores and technical details without making raw tables the main interface. The visual redesign does not change model settings, the data split, or the measured Telco results above.

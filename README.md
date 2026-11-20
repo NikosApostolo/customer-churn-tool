@@ -20,20 +20,21 @@ This project connects those steps in one interface. Users can compare models, in
 
 ## Using the app
 
-The opening screen introduces the project and its prediction → explanation → retention workflow. Choose **Sample data** and click **Use sample data**, or select **Upload CSV**. Once loaded, **Change customer data** lets you switch inputs. Use **Explore the dashboard** to move between four sections:
+The opening screen introduces the project and its prediction → explanation → retention workflow. Choose **Sample data** and click **Use sample data**, or select **Upload CSV**. Once loaded, **Change customer data** lets you switch inputs. Use **Explore the dashboard** to move between five sections:
 
 | Section | What it shows | Question it answers |
 |---|---|---|
 | Customers | Outcome counts, missing values, churn within groups | What does the historical data contain? |
 | Models | Precision/recall bars, precision–recall curves, a confusion-matrix heatmap | How useful are the predictions, and where are the mistakes? |
 | Individual risk | Score distribution, a churn-capture curve, a ranked list, individual SHAP bars | Who receives high scores, and which inputs influence them? |
+| Score active customers | Upload a second CSV, inspect scores and explanations, and download rankings | Who should I consider contacting now? |
 | Retention plan | Cost/benefit bars and savings across campaign sizes | What could contacting these customers cost or save? |
 
 Charts include labeled axes, short explanations, and tap/hover details. On narrow screens, charts and controls stack vertically, summary cards use two columns, and navigation uses a full-width section selector. Customer group counts are also available in an expandable table. Campaign inputs and the selected customer are preserved when switching sections. Detailed interpretation, worked examples, and caveats are in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
 
 The app downloads the sample automatically. If the download fails, it uses clearly labeled fictional data so the interface remains usable.
 
-Rankings cover held-out test customers, whose outcomes were not used for training or model selection. This version evaluates historical customers; it does not yet score a separate file of future customers without known outcomes.
+**Score active customers** accepts a second CSV with a unique `customerID`, the same model inputs as the historical file, and no `Churn` column. The selected model scores this file using the fitted training pipeline. Historical test metrics stay separate. Use the sample to download two disjoint CSVs and try the full workflow. The scoring sample reuses held-out historical rows with outcomes removed.
 
 ## How it works
 
@@ -122,7 +123,7 @@ The savings calculation depends on an assumed offer success rate and model risk 
 
 The sample is an older demonstration dataset. A random split does not establish performance on future customers, and fairness across customer groups has not been assessed. Use with another business would require a defined prediction horizon, time-based evaluation where possible, and checks on probability quality and sensitive features.
 
-Uploads require supported Telco-style columns and known historical churn outcomes. Use public or fictional data for this portfolio app: uploaded data is processed on the server and temporarily cached in memory. The app does not provide production access controls.
+Historical uploads require supported Telco-style columns and known churn outcomes. Scoring uploads require the corresponding inputs available at the time the prediction is made. The Telco sample does not validate performance over a future time window. Use public or fictional data for this portfolio app: uploaded data is processed on the server and temporarily cached in memory. The app does not provide production access controls.
 
 ## Data sources
 

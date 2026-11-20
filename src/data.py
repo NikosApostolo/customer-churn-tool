@@ -81,6 +81,18 @@ def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series,
     y = y.astype(int)
     if len(y.value_counts()) != 2 or y.value_counts().min() < 20:
         raise ValueError("Include both churn classes, with at least 20 customers in each.")
+    X, ids, notes = clean_features(frame)
+    return X, y.reset_index(drop=True), ids, notes
+
+
+def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str]]:
+    """Apply the same input rules to historical and scoring rows."""
+    frame = frame.copy()
+    frame.columns = frame.columns.astype(str).str.strip()
+    if frame.columns.duplicated().any():
+        raise ValueError("Column names must be unique after removing surrounding spaces.")
+    if not 1 <= len(frame) <= 15000:
+        raise ValueError("Provide between 1 and 15,000 customer rows.")
     if "customerID" in frame:
         ids = frame["customerID"].astype("string").str.strip()
         if ids.isna().any() or ids.eq("").any() or ids.duplicated().any():
@@ -112,4 +124,5 @@ def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series,
             if X[col].nunique() > 50:
                 raise ValueError(f"{col} has too many categories. Check for identifiers or free text.")
     notes.append("Missing feature values are filled using training data only.")
-    return X.reset_index(drop=True), y.reset_index(drop=True), ids.reset_index(drop=True), notes
+    return X.reset_index(drop=True), ids.reset_index(drop=True), notes
+

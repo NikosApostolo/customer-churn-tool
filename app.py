@@ -8,7 +8,7 @@ import streamlit as st
 
 from src import charts
 from src.business import estimate_savings
-from src.data import clean_data, load_sample, read_csv_bytes
+from src.data import clean_data, clean_features, load_sample, read_csv_bytes
 from src.explain import explain_customer
 from src.model import rank_customers, train_models
 from src.layout import apply_layout, select_section, has_customer_data, landing_intro, landing_features
@@ -50,6 +50,7 @@ def select_sample() -> None:
     frame, label = cached_sample()
     st.session_state["sample_content"] = frame.to_csv(index=False).encode("utf-8")
     st.session_state["sample_label"] = label
+    st.session_state["dashboard_section"] = "Score active customers"
 
 
 def load_input() -> tuple[bytes | None, str]:
@@ -122,16 +123,22 @@ def models_view(bundle: dict[str, Any]) -> None:
         st.markdown(f"[How evaluation works]({REPO}/blob/main/docs/METHODOLOGY.md#evaluation)")
 
 
-def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> None:
+def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame,
+              active: pd.DataFrame | None = None) -> None:
     st.subheader("Customer risk")
-    caption(f"{len(ranked):,} unseen test customers, highest risk first. Scores are estimates, not certainties.")
+    population = "scoring customers" if active is not None else "held-out test customers"
+    caption(f"{len(ranked):,} {population}, highest estimated risk first.")
     visible = ranked[["customerID", "risk_score"]].copy()
     visible["risk_percent"] = (visible.pop("risk_score").astype(float) * 100).round(1)
     st.dataframe(visible, column_config={
         "customerID": st.column_config.TextColumn("Customer", width="small"),
         "risk_percent": st.column_config.ProgressColumn("Risk", width="small", format="%.1f%%", min_value=0, max_value=100),
     }, hide_index=True, height=250, use_container_width=True)
-    st.download_button("Download rankings", visible.to_csv(index=False, float_format="%.1f"), "churn_rankings.csv", "text/csv", use_container_width=True)
+    export = ranked[["customerID", "risk_score"]].copy()
+    export["customerID"] = export["customerID"].map(
+        lambda value: "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) else value
+    )
+    st.download_button("Download rankings", export.to_csv(index=False), "churn_rankings.csv", "text/csv", use_container_width=True)
     ids = ranked.customerID.tolist()
     previous = st.session_state.get("selected_customer")
     if st.session_state.get("customer") not in ids:
@@ -141,7 +148,13 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
     record = ranked.loc[ranked.customerID == selected].iloc[0]
     st.metric("Estimated churn risk", f"{record.risk_score:.1%}")
     try:
-        reasons = cached_explanation(content, int(record.row_index))
+        if active is None:
+            reasons = cached_explanation(content, int(record.row_index))
+        else:
+            result = bundle["result"]
+            reasons = explain_customer(result["models"][result["winner"]],
+                                       bundle["X"].iloc[result["train_idx"]],
+                                       active.iloc[[int(record.row_index)]])
         draw(charts.shap_chart(reasons))
         caption("Coral pushes the model score up; teal pushes it down. Bar length shows influence, not a probability change or proven cause.")
         top = reasons.iloc[0]
@@ -150,11 +163,13 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
             st.write(f"Strongest influence: **{charts.feature_name(top.Feature)} = {top.Value}**, pushing the score {direction}.")
         with st.expander("Customer details and all influences"):
             st.dataframe(reasons.round({"Contribution": 3}), hide_index=True, use_container_width=True)
-            st.dataframe(bundle["X"].iloc[[int(record.row_index)]], hide_index=True, use_container_width=True)
+            st.dataframe((bundle["X"] if active is None else active).iloc[[int(record.row_index)]], hide_index=True, use_container_width=True)
             st.markdown(f"[How SHAP explanations work]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md#individual-risk)")
     except Exception:
         logging.exception("SHAP explanation failed")
         st.warning("This explanation is unavailable. Rankings and campaign calculations still work.")
+    if active is not None:
+        return
     with st.expander("Check the risk ranking"):
         draw(charts.distribution_chart(ranked))
         caption("Customers in each 10-point risk range. Probability calibration has not been established.")
@@ -168,7 +183,9 @@ def risk_view(bundle: dict[str, Any], content: bytes, ranked: pd.DataFrame) -> N
         caption("This measures historical ranking quality, not whether offers prevent churn.")
 
 
-def campaign_view(ranked: pd.DataFrame) -> None:
+def campaign_view(ranked: pd.DataFrame,
+                  historical_ranking: pd.DataFrame | None = None,
+                  outcomes: pd.Series | None = None) -> None:
     st.subheader("Retention scenario")
     caption("Set costs and an assumed offer effect. Use the same currency for both amounts.")
     settings = st.session_state.setdefault("campaign_settings", {"cost": 20.0, "value": 500.0, "share": 20, "success": 15})
@@ -179,6 +196,17 @@ def campaign_view(ranked: pd.DataFrame) -> None:
     cost = a.number_input("Offer cost per contacted customer", min_value=0.0, value=None, step=1.0, key="offer_cost", help="Assume this cost is paid for everyone contacted.")
     value = b.number_input("Value of a lost customer", min_value=0.0, value=None, step=10.0, key="customer_value", help="Use lost profit or contribution over one defined period, in the same currency as the offer cost.")
     share = st.slider("Contact the top X% by risk", 0, 100, key="contact_share")
+    if historical_ranking is not None:
+        budget = st.number_input("Campaign budget (optional)", min_value=0.0, value=None,
+                                 help="Use the same currency as the offer cost.")
+        if budget is not None and cost is not None:
+            capacity = len(ranked) if cost == 0 else min(len(ranked), int(budget / cost))
+            caption(f"This budget covers {capacity:,} of {len(ranked):,} customers.")
+            if np.ceil(len(ranked) * share / 100) > capacity:
+                st.warning("The selected contact share exceeds your budget.")
+        count = int(np.ceil(len(historical_ranking) * share / 100))
+        labels = outcomes.iloc[historical_ranking.row_index]
+        caption(f"At this contact share, the model found {labels.iloc[:count].sum() / labels.sum():.1%} of churners in the historical test set.")
     success = st.slider("Assumed share of would-be churners saved by the offer (%)", 0, 100, key="offer_success")
     if cost is None or value is None:
         st.info("Enter an offer cost and customer value to calculate the scenario.")
@@ -207,6 +235,44 @@ def campaign_view(ranked: pd.DataFrame) -> None:
         st.write(f"Avoided loss {savings['avoided_loss']:,.2f} − offer spend {savings['offer_spend']:,.2f} = net savings {savings['net_savings']:,.2f}.")
         st.write("Expected retained customers = sum of contacted risk scores × assumed offer success. Costs apply to every contacted customer.")
         st.markdown(f"[Assumptions and savings formula]({REPO}/blob/main/docs/METHODOLOGY.md#retention-scenario)")
+
+
+def scoring_view(bundle: dict[str, Any], content: bytes, label: str) -> None:
+    st.subheader("Score active customers")
+    caption("Upload a second CSV with customer IDs and the same input columns as your historical file. Leave out Churn.")
+    with st.expander("Input columns"):
+        st.write(", ".join(bundle["X"].columns))
+    upload = st.file_uploader("Active customer CSV", type=["csv"], key="active_upload")
+    result = bundle["result"]
+    if upload is None:
+        if label == "Uploaded customer data":
+            return
+        test = result["test_idx"]
+        sample = bundle["X"].iloc[test].assign(customerID=bundle["ids"].iloc[test])
+        historical = read_csv_bytes(content).iloc[np.r_[result["train_idx"], result["val_idx"]]]
+        caption("Demo: held-out historical customers with their outcomes removed, standing in for an active list.")
+        st.download_button("Sample historical CSV", historical.to_csv(index=False), "sample_history.csv", "text/csv")
+        st.download_button("Sample scoring CSV", sample.to_csv(index=False), "sample_active.csv", "text/csv")
+        frame = sample
+    else:
+        frame = read_csv_bytes(upload.getvalue())
+    columns = frame.columns.str.strip()
+    if "Churn" in columns or "customerID" not in columns:
+        raise ValueError("The active CSV needs a customerID column and must leave out Churn.")
+    missing = bundle["X"].columns.difference(columns)
+    if len(missing):
+        raise ValueError("Active CSV is missing model inputs: " + ", ".join(missing))
+    active, ids, notes = clean_features(frame)
+    active = active[bundle["X"].columns]
+    for note in notes:
+        if not note.startswith("Missing feature"):
+            caption(note)
+    model = result["models"][result["winner"]]
+    ranked = pd.DataFrame({"row_index": active.index, "customerID": ids,
+                           "risk_score": model.predict_proba(active)[:, 1]})
+    ranked = ranked.sort_values("risk_score", ascending=False, kind="stable").reset_index(drop=True)
+    risk_view(bundle, content, ranked, active)
+    campaign_view(ranked, rank_customers(result, bundle["X"], bundle["ids"]), bundle["y"])
 
 
 def main() -> None:
@@ -238,8 +304,10 @@ def main() -> None:
         models_view(bundle)
     elif section == "Individual risk":
         risk_view(bundle, content, ranked)
-    else:
+    elif section == "Retention plan":
         campaign_view(ranked)
+    else:
+        scoring_view(bundle, content, label)
     st.divider()
     st.markdown(f"[Guide and methodology]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md) · [Source code]({REPO})")
 
@@ -252,3 +320,4 @@ if __name__ == "__main__":
     except Exception:
         logging.exception("Application failed")
         st.error("We could not finish this run. Try the sample data or a smaller Telco-style CSV. If the problem continues, check the server logs.")
+
