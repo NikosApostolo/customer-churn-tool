@@ -8,7 +8,7 @@ import streamlit as st
 
 from src import charts
 from src.business import estimate_savings
-from src.data import clean_data, clean_features, load_sample, normalize_columns, read_csv_bytes
+from src.data import CATEGORICAL, NUMERIC, clean_data, clean_features, load_sample, normalize_columns, read_csv_bytes
 from src.explain import explain_customer
 from src.model import rank_customers, train_models
 from src.layout import apply_layout, select_section, has_customer_data, landing_intro, landing_features
@@ -24,7 +24,7 @@ def cached_sample() -> tuple[pd.DataFrame, str]:
 
 @st.cache_data(ttl=1800, max_entries=3, show_spinner=False)
 def cached_training(content: bytes) -> dict[str, Any]:
-    X, y, ids, notes = clean_data(read_csv_bytes(content))
+    X, y, ids, notes = clean_data(read_csv_bytes(content), infer=True)
     result = train_models(X, y)
     scores = {name: model.predict_proba(X.iloc[result["test_idx"]])[:, 1] for name, model in result["models"].items()}
     return {"X": X, "y": y, "ids": ids, "notes": notes, "result": result, "scores": scores}
@@ -71,7 +71,7 @@ def load_input() -> tuple[bytes | None, str]:
             content = upload.getvalue() if upload is not None else None
             label = "Uploaded customer data"
             if not loaded:
-                st.caption("Upload one labeled IBM Telco or Customer Churn Prediction 2020 CSV. Maximum 10 MB.")
+                st.caption("Upload one CSV of historical customers with known churn outcomes. Maximum 10 MB.")
         caption("Use public or fictional data only.")
         st.markdown(f"[CSV requirements and privacy]({REPO}/blob/main/docs/METHODOLOGY.md#input-data)")
     return content, label
@@ -263,7 +263,7 @@ def scoring_view(bundle: dict[str, Any], content: bytes, label: str) -> None:
     missing = bundle["X"].columns.difference(columns)
     if len(missing):
         raise ValueError("Active CSV is missing model inputs: " + ", ".join(missing))
-    active, ids, notes = clean_features(frame)
+    active, ids, notes = clean_features(frame, schema=bundle["X"])
     active = active[bundle["X"].columns]
     for note in notes:
         if not note.startswith("Missing feature"):
@@ -292,6 +292,21 @@ def main() -> None:
     if content is None:
         st.markdown(f"[Read how the app works]({REPO}/blob/main/docs/READING_THE_DASHBOARD.md) · [Project and methodology]({REPO}#readme)")
         return
+    if label == "Uploaded customer data":
+        frame = normalize_columns(read_csv_bytes(content))
+        if "Churn" not in frame:
+            candidate = st.selectbox("Which column records whether the customer left?",
+                                     frame.columns.tolist(), index=None)
+            if candidate is None:
+                return
+            content = frame.rename(columns={candidate: "Churn"}).to_csv(index=False).encode("utf-8")
+        if not set(frame.columns).intersection(NUMERIC + CATEGORICAL):
+            st.warning("Inputs were inferred from this file. Review the columns below and remove any fields recorded after churn before relying on the results.")
+        preview, _, _, notes = clean_data(read_csv_bytes(content), infer=True)
+        with st.expander("Detected CSV inputs"):
+            st.write(", ".join(preview.columns))
+            for note in notes:
+                caption(note)
     with st.spinner("Preparing the data and comparing models. The first run takes a little longer…"):
         bundle = cached_training(content)
     if "SYNTHETIC" in label:

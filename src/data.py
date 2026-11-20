@@ -1,4 +1,6 @@
 """Read CSV files and apply deterministic Telco schema checks."""
+import csv
+import re
 from io import BytesIO
 from urllib.request import urlopen
 
@@ -25,7 +27,10 @@ NUMERIC += [
 ]
 CATEGORICAL += ["state", "area_code", "international_plan", "voice_mail_plan"]
 COLUMN_NAMES = {name.casefold(): name for name in NUMERIC + CATEGORICAL + ["Churn", "customerID"]}
-COLUMN_NAMES["id"] = "customerID"
+COLUMN_NAMES.update(dict.fromkeys(
+    ["churned", "is_churn", "is_churned", "churn_flag", "churn_label", "customer_churn", "attrition", "exited"], "Churn"
+))
+COLUMN_NAMES.update(dict.fromkeys(["id", "customer_id", "customer id"], "customerID"))
 
 
 def normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
@@ -42,14 +47,18 @@ MAX_BYTES = 10 * 1024 * 1024
 
 def read_csv_bytes(content: bytes) -> pd.DataFrame:
     """Read a small UTF-8, comma-separated CSV with friendly errors."""
-    if not content or len(content) > MAX_BYTES:
+    if not content.strip() or len(content) > MAX_BYTES:
         raise ValueError("Choose a nonempty CSV smaller than 10 MB.")
     try:
-        frame = pd.read_csv(BytesIO(content), encoding="utf-8-sig")
-    except (UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
-        raise ValueError("Cannot read this file. Export a UTF-8, comma-separated CSV.") from exc
+        header = next((line for line in content.decode("utf-8-sig").splitlines() if line.strip()), "")
+        # Count parsed header fields so punctuation inside quotes is ignored.
+        delimiter = max((",", ";", "\t", "|"),
+                        key=lambda sep: len(next(csv.reader([header], delimiter=sep), [])))
+        frame = pd.read_csv(BytesIO(content), encoding="utf-8-sig", sep=delimiter)
+    except (UnicodeError, csv.Error, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        raise ValueError("Cannot read this file. Export a UTF-8 CSV with a header.") from exc
     if len(frame.columns) < 2:
-        raise ValueError("Expected comma-separated columns. Check your CSV separator.")
+        raise ValueError("Expected at least two columns. Check your CSV separator.")
     if len(frame) > 15000:
         raise ValueError("Use at most 15,000 rows for this free demo.")
     return frame
@@ -85,7 +94,7 @@ def load_sample() -> tuple[pd.DataFrame, str]:
         return synthetic_sample(), "SYNTHETIC offline demo — not the Telco dataset"
 
 
-def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[str]]:
+def clean_data(frame: pd.DataFrame, infer: bool = False) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[str]]:
     """Validate labels and formats without learning statistics from the data."""
     frame = normalize_columns(frame)
     if "Churn" not in frame:
@@ -93,17 +102,18 @@ def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series,
     if not 100 <= len(frame) <= 15000:
         raise ValueError("Provide between 100 and 15,000 historical customer rows.")
     label = frame["Churn"].astype("string").str.strip().str.lower()
-    y = label.map({"yes": 1, "no": 0, "1": 1, "0": 0, "1.0": 1, "0.0": 0})
+    y = label.map({"yes": 1, "no": 0, "1": 1, "0": 0, "1.0": 1, "0.0": 0, "true": 1, "false": 0, "churned": 1, "retained": 0, "stayed": 0, "left": 1})
     if y.isna().any():
-        raise ValueError("Every Churn value must be Yes/No or 1/0; missing labels are not guessed.")
+        raise ValueError("Every Churn value needs a recognized outcome, such as Yes/No, True/False, 1/0, or Left/Stayed.")
     y = y.astype(int)
     if len(y.value_counts()) != 2 or y.value_counts().min() < 20:
         raise ValueError("Include both churn classes, with at least 20 customers in each.")
-    X, ids, notes = clean_features(frame)
+    X, ids, notes = clean_features(frame, infer=infer)
     return X, y.reset_index(drop=True), ids, notes
 
 
-def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str]]:
+def clean_features(frame: pd.DataFrame, infer: bool = False,
+                   schema: pd.DataFrame | None = None) -> tuple[pd.DataFrame, pd.Series, list[str]]:
     """Apply the same input rules to historical and scoring rows."""
     frame = normalize_columns(frame)
     if not 1 <= len(frame) <= 15000:
@@ -115,6 +125,27 @@ def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[s
     else:
         ids = pd.Series([f"ROW-{i + 1}" for i in range(len(frame))], index=frame.index)
     features = [c for c in NUMERIC + CATEGORICAL if c in frame]
+    inferred_numbers = set()
+    if schema is not None:
+        features = list(schema.columns)
+        inferred_numbers = set(schema.select_dtypes(include="number").columns)
+    elif infer and not features:
+        for col in frame:
+            words = set(re.findall(r"[a-z0-9]+", col.casefold()))
+            if col in {"Churn", "customerID"} or words & {
+                "id", "name", "email", "address", "phone", "churn", "attrition",
+                "target", "label", "outcome", "status", "exit", "cancellation",
+                "retention", "probability", "prediction", "score", "reason",
+            }:
+                continue
+            values = clean_text(frame[col]).dropna()
+            if values.empty:
+                continue
+            if pd.to_numeric(values, errors="coerce").notna().all():
+                inferred_numbers.add(col)
+            elif values.nunique() > min(50, max(2, len(values) // 5)):
+                continue
+            features.append(col)
     if not features:
         raise ValueError("No supported features found. Use IBM Telco or Customer Churn Prediction 2020 columns.")
     X = frame[features].copy()
@@ -123,11 +154,12 @@ def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[s
     if ignored:
         notes.append("Ignored unsupported columns: " + ", ".join(ignored))
     for col in features:
-        text = X[col].astype("string").str.strip()
-        text = text.mask(text.str.lower().isin(["", "na", "n/a", "null", "none", "nan"]))
-        if col in NUMERIC:
+        text = clean_text(X[col])
+        if col in NUMERIC or col in inferred_numbers:
             values = pd.to_numeric(text, errors="coerce").astype(float)
-            invalid = ~np.isfinite(values) | (values < 0)
+            invalid = ~np.isfinite(values)
+            if col in NUMERIC:
+                invalid |= values < 0
             if col == "SeniorCitizen":
                 invalid |= ~values.isin([0, 1])
             X[col] = values.mask(invalid)
@@ -141,3 +173,8 @@ def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[s
     notes.append("Missing feature values are filled using training data only.")
     return X.reset_index(drop=True), ids.reset_index(drop=True), notes
 
+
+
+def clean_text(series: pd.Series) -> pd.Series:
+    text = series.astype("string").str.strip()
+    return text.mask(text.str.lower().isin(["", "na", "n/a", "null", "none", "nan"]))

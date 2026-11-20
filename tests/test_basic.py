@@ -21,8 +21,22 @@ def test_missing_label() -> None:
 
 
 def test_bad_csv() -> None:
-    with pytest.raises(ValueError, match="comma-separated"):
-        read_csv_bytes(b"a;b\n1;2\n")
+    with pytest.raises(ValueError, match="at least two columns"):
+        read_csv_bytes(b"a\n1\n")
+
+
+def test_inferred_inputs_from_semicolon_csv() -> None:
+    frame = synthetic_sample().rename(
+        columns={"Churn": "churned", "tenure": "Months enrolled", "Contract": "Plan family"}
+    )[["churned", "Months enrolled", "Plan family"]]
+    frame["churn_reason"] = "outcome proxy"
+    raw = frame.to_csv(index=False, sep=";").encode()
+    features, labels, _, _ = clean_data(read_csv_bytes(raw), infer=True)
+    assert list(features) == ["Months enrolled", "Plan family"]
+    assert pd.api.types.is_numeric_dtype(features["Months enrolled"])
+    np.testing.assert_array_equal(labels, frame.churned.eq("Yes"))
+    result = train_models(features, labels)
+    assert result["metrics"]["Test AP"].notna().all()
 
 
 def test_cleaning() -> None:
@@ -180,7 +194,7 @@ def test_invalid_upload_interface() -> None:
     with patch("streamlit.file_uploader", return_value=BytesIO(content)):
         app.radio[0].set_value("Upload CSV").run()
     assert not app.exception
-    assert any("Missing Churn" in error.value for error in app.error)
+    assert any(w.label == "Which column records whether the customer left?" for w in app.selectbox)
 
 
 def test_zero_contribution_sentence() -> None:
@@ -234,3 +248,4 @@ def test_chart_specs_on_real_pipeline(trained: tuple) -> None:
     ]
     for figure in figures:
         figure.to_json()
+

@@ -6,7 +6,7 @@ For chart-by-chart explanations and examples, see [Reading the dashboard](READIN
 
 ## Input data
 
-The app accepts a UTF-8, comma-separated CSV containing historical customer records. Files must be at most 10 MB, with 100–15,000 rows and at least 20 examples of each outcome.
+The app accepts a UTF-8 CSV (comma, semicolon, tab, or pipe) containing historical customer records. Files must be at most 10 MB, with 100–15,000 rows and at least 20 examples of each outcome.
 
 `Churn` is required and must contain Yes/No or 1/0. Missing outcomes are rejected rather than guessed. `customerID` is optional; when supplied, values must be nonempty and unique. Otherwise, row identifiers are generated for display.
 
@@ -19,7 +19,9 @@ At least one supported feature is required:
 
 The original **Customer Churn Prediction 2020** CSVs also work. Matching supported headers ignores letter case and surrounding spaces. The app reads lowercase `churn` as the outcome and accepts `id` as a customer identifier. It uses all 19 published predictors when present, including account length, plan flags, service calls, usage, and charges. Upload the labeled file for training and evaluation.
 
-Other columns are ignored and reported in the cleaning notes. Restricting inputs to named fields avoids silently treating arbitrary identifiers or outcome summaries as features. It does not establish when the inputs were measured: all supplied features must have been available before the churn outcome.
+For unfamiliar layouts without any recognized model inputs, the upload screen infers numeric and low-cardinality categorical fields. It skips obvious identifiers, contact fields, and outcome proxies by name and shows the selected inputs. The source owner must still verify that every input was available before churn. When no recognized outcome header exists, select the outcome column in the app.
+
+For known layouts, other columns are ignored and reported in the cleaning notes. Restricting inputs to named fields avoids silently treating arbitrary identifiers or outcome summaries as features. It does not establish when the inputs were measured: all supplied features must have been available before the churn outcome.
 
 The sample is downloaded from IBM's public CSV. If downloading or validation fails, the app creates 800 fictional records with a fixed seed and labels the source as synthetic. Results from that fallback are not Telco results.
 

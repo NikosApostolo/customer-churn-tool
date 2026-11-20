@@ -22,7 +22,7 @@ SEED = 42
 
 def make_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
     """Fill missing data, scale numbers and encode categories inside the pipeline."""
-    numeric = [c for c in X if c in NUMERIC]
+    numeric = [c for c in X if c in NUMERIC or pd.api.types.is_numeric_dtype(X[c])]
     categorical = [c for c in X if c not in numeric]
     return ColumnTransformer([
         ("numeric", Pipeline([
@@ -92,3 +92,4 @@ def rank_customers(result: dict[str, Any], X: pd.DataFrame, ids: pd.Series) -> p
         "risk_score": pipeline.predict_proba(X.iloc[idx])[:, 1],
     })
     return ranked.sort_values("risk_score", ascending=False, kind="stable").reset_index(drop=True)
+
