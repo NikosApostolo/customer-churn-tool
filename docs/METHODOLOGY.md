@@ -17,13 +17,15 @@ At least one supported feature is required:
 | Numeric | `tenure`, `MonthlyCharges`, `TotalCharges`, `SeniorCitizen` |
 | Categorical | `gender`, `Partner`, `Dependents`, `PhoneService`, `MultipleLines`, `InternetService`, `OnlineSecurity`, `OnlineBackup`, `DeviceProtection`, `TechSupport`, `StreamingTV`, `StreamingMovies`, `Contract`, `PaperlessBilling`, `PaymentMethod` |
 
+The original **Customer Churn Prediction 2020** CSVs also work. Matching supported headers ignores letter case and surrounding spaces. The app reads lowercase `churn` as the outcome and accepts `id` as a customer identifier. It uses all 19 published predictors when present, including account length, plan flags, service calls, usage, and charges. Upload the labeled file for training and evaluation.
+
 Other columns are ignored and reported in the cleaning notes. Restricting inputs to named fields avoids silently treating arbitrary identifiers or outcome summaries as features. It does not establish when the inputs were measured: all supplied features must have been available before the churn outcome.
 
 The sample is downloaded from IBM's public CSV. If downloading or validation fails, the app creates 800 fictional records with a fixed seed and labels the source as synthetic. Results from that fallback are not Telco results.
 
 ## Cleaning and preparation
 
-Column names lose surrounding spaces. Category values are stripped and lowercased, and common missing-value markers become missing entries. Numeric fields are converted to numbers; invalid, negative, and nonfinite values become missing. `SeniorCitizen` accepts only 0 or 1. Categorical fields with more than 50 distinct values are rejected to catch likely free text or identifiers.
+Column names lose surrounding spaces. Category values are stripped and lowercased, and common missing-value markers become missing entries. Numeric fields are converted to numbers; invalid, negative, and nonfinite values become missing. `SeniorCitizen` accepts only 0 or 1. Categorical fields with more than 50 distinct values (51 for the 2020 dataset’s `state` field) are rejected to catch likely free text or identifiers.
 
 These format checks do not estimate values from the dataset. The learned preparation happens inside each model's training pipeline:
 

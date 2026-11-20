@@ -16,6 +16,27 @@ CATEGORICAL = [
     "TechSupport", "StreamingTV", "StreamingMovies", "Contract",
     "PaperlessBilling", "PaymentMethod",
 ]
+# Published Customer Churn Prediction 2020 fields. Charges retain their
+# original meaning and are not treated as monthly or lifetime billing.
+NUMERIC += [
+    "account_length", "number_vmail_messages", "number_customer_service_calls",
+    *[f"total_{period}_{measure}" for period in ("day", "eve", "night", "intl")
+      for measure in ("minutes", "calls", "charge")],
+]
+CATEGORICAL += ["state", "area_code", "international_plan", "voice_mail_plan"]
+COLUMN_NAMES = {name.casefold(): name for name in NUMERIC + CATEGORICAL + ["Churn", "customerID"]}
+COLUMN_NAMES["id"] = "customerID"
+
+
+def normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Resolve supported headers without changing original field meanings."""
+    names = [str(name).strip() for name in frame.columns]
+    names = [COLUMN_NAMES.get(name.casefold(), name) for name in names]
+    if pd.Index(names).duplicated().any():
+        raise ValueError("Column names must be unique after normalizing supported headers.")
+    return frame.set_axis(names, axis="columns")
+
+
 MAX_BYTES = 10 * 1024 * 1024
 
 
@@ -66,12 +87,9 @@ def load_sample() -> tuple[pd.DataFrame, str]:
 
 def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[str]]:
     """Validate labels and formats without learning statistics from the data."""
-    frame = frame.copy()
-    frame.columns = frame.columns.astype(str).str.strip()
-    if frame.columns.duplicated().any():
-        raise ValueError("Column names must be unique after removing surrounding spaces.")
+    frame = normalize_columns(frame)
     if "Churn" not in frame:
-        raise ValueError("Missing Churn column. Add Yes/No or 1/0 historical outcomes.")
+        raise ValueError("Missing Churn column. Upload a historical CSV with known churn outcomes.")
     if not 100 <= len(frame) <= 15000:
         raise ValueError("Provide between 100 and 15,000 historical customer rows.")
     label = frame["Churn"].astype("string").str.strip().str.lower()
@@ -87,10 +105,7 @@ def clean_data(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series,
 
 def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str]]:
     """Apply the same input rules to historical and scoring rows."""
-    frame = frame.copy()
-    frame.columns = frame.columns.astype(str).str.strip()
-    if frame.columns.duplicated().any():
-        raise ValueError("Column names must be unique after removing surrounding spaces.")
+    frame = normalize_columns(frame)
     if not 1 <= len(frame) <= 15000:
         raise ValueError("Provide between 1 and 15,000 customer rows.")
     if "customerID" in frame:
@@ -101,7 +116,7 @@ def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[s
         ids = pd.Series([f"ROW-{i + 1}" for i in range(len(frame))], index=frame.index)
     features = [c for c in NUMERIC + CATEGORICAL if c in frame]
     if not features:
-        raise ValueError("No supported Telco features found. Try tenure, MonthlyCharges, or Contract.")
+        raise ValueError("No supported features found. Use IBM Telco or Customer Churn Prediction 2020 columns.")
     X = frame[features].copy()
     notes = []
     ignored = [c for c in frame if c not in features + ["Churn", "customerID"]]
@@ -121,7 +136,7 @@ def clean_features(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[s
                 notes.append(f"{col}: {count} invalid values treated as missing.")
         else:
             X[col] = text.str.lower().astype(object).where(text.notna(), np.nan)
-            if X[col].nunique() > 50:
+            if X[col].nunique() > (51 if col == "state" else 50):
                 raise ValueError(f"{col} has too many categories. Check for identifiers or free text.")
     notes.append("Missing feature values are filled using training data only.")
     return X.reset_index(drop=True), ids.reset_index(drop=True), notes

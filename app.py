@@ -8,7 +8,7 @@ import streamlit as st
 
 from src import charts
 from src.business import estimate_savings
-from src.data import clean_data, clean_features, load_sample, read_csv_bytes
+from src.data import clean_data, clean_features, load_sample, normalize_columns, read_csv_bytes
 from src.explain import explain_customer
 from src.model import rank_customers, train_models
 from src.layout import apply_layout, select_section, has_customer_data, landing_intro, landing_features
@@ -71,7 +71,7 @@ def load_input() -> tuple[bytes | None, str]:
             content = upload.getvalue() if upload is not None else None
             label = "Uploaded customer data"
             if not loaded:
-                st.caption("Include a Churn column with Yes/No or 1/0 historical outcomes. Maximum 10 MB.")
+                st.caption("Upload one labeled IBM Telco or Customer Churn Prediction 2020 CSV. Maximum 10 MB.")
         caption("Use public or fictional data only.")
         st.markdown(f"[CSV requirements and privacy]({REPO}/blob/main/docs/METHODOLOGY.md#input-data)")
     return content, label
@@ -256,7 +256,8 @@ def scoring_view(bundle: dict[str, Any], content: bytes, label: str) -> None:
         frame = sample
     else:
         frame = read_csv_bytes(upload.getvalue())
-    columns = frame.columns.str.strip()
+    frame = normalize_columns(frame)
+    columns = frame.columns
     if "Churn" in columns or "customerID" not in columns:
         raise ValueError("The active CSV needs a customerID column and must leave out Churn.")
     missing = bundle["X"].columns.difference(columns)
