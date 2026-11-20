@@ -47,8 +47,9 @@ def train_models(X: pd.DataFrame, y: pd.Series) -> dict[str, Any]:
     estimators = {
         "Logistic regression": LogisticRegression(max_iter=2000, random_state=SEED),
         "XGBoost": XGBClassifier(
-            n_estimators=180, max_depth=3, learning_rate=0.05,
-            subsample=0.9, colsample_bytree=0.9, reg_lambda=2,
+            n_estimators=400, max_depth=2, learning_rate=0.03,
+            subsample=0.9, colsample_bytree=0.9, reg_lambda=5,
+            min_child_weight=10,
             objective="binary:logistic", eval_metric="logloss",
             random_state=SEED, n_jobs=2, tree_method="hist",
         ),

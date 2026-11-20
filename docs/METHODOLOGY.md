@@ -44,7 +44,7 @@ The split uses random seed 42 and preserves approximately the same class proport
 | Validation | 20% | Choose the model using average precision |
 | Test | 20% | Report final metrics and rank unseen customers |
 
-Logistic regression uses a maximum of 2,000 optimization iterations. XGBoost uses 180 trees, maximum depth 3, learning rate 0.05, row and column sampling of 0.9, and L2 regularization of 2. These settings are fixed rather than tuned on the test group.
+Logistic regression uses a maximum of 2,000 optimization iterations. XGBoost uses 400 trees, maximum depth 2, learning rate 0.03, row and column sampling of 0.9, L2 regularization of 5, and minimum child weight 10. These settings were chosen in a small nested-validation study excluding the published test customers; see [Model improvement study](MODEL_IMPROVEMENT.md). They remain fixed when the app trains on an upload.
 
 The model with the highest validation average precision is selected. Both candidates' test results are displayed, but those results do not change the selection. The models are not subsequently fitted on the test customers. All displayed rankings therefore come from customers held out of both training and selection.
 

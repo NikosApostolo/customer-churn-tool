@@ -49,12 +49,15 @@ See [Methodology](docs/METHODOLOGY.md) for the implementation details and [Mathe
 
 ## Results
 
+The [model improvement study](docs/MODEL_IMPROVEMENT.md) records the nested validation experiments, full results, and limitations behind the updated XGBoost settings.
+
+
 Measured on the 7,043-row IBM Telco sample with the supplied code:
 
 | Model | Validation AP | Test precision | Test recall | Test AP | Test Brier |
 |---|---:|---:|---:|---:|---:|
 | Logistic regression | 0.6423 | 0.6509 | 0.5535 | 0.6338 | 0.1378 |
-| XGBoost | 0.6459 | 0.6644 | 0.5134 | 0.6631 | 0.1350 |
+| XGBoost | 0.6480 | 0.6643 | 0.5027 | 0.6674 | 0.1345 |
 
 XGBoost was selected by validation average precision, although the difference was small. Logistic regression had higher recall at the fixed threshold. The results show a tradeoff rather than a clear advantage on every measure.
 

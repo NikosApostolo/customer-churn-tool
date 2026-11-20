@@ -1,0 +1,21 @@
+{
+  "winner": "XGBoost",
+  "metrics": [
+    {
+      "Model": "Logistic regression",
+      "Validation AP": 0.6422751776911828,
+      "Test precision": 0.6509433962264151,
+      "Test recall": 0.553475935828877,
+      "Test AP": 0.6337547111350025,
+      "Test Brier": 0.13775858219855178
+    },
+    {
+      "Model": "XGBoost",
+      "Validation AP": 0.6479759096839498,
+      "Test precision": 0.6643109540636042,
+      "Test recall": 0.5026737967914439,
+      "Test AP": 0.6673774214648189,
+      "Test Brier": 0.13451036548708248
+    }
+  ]
+}

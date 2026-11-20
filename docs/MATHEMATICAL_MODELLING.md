@@ -131,7 +131,7 @@ $$
 
 A tree routes a customer through questions about their inputs and assigns a score at the final leaf. If $q(z)$ identifies that leaf and $w_k$ is its score, then $f_t(z)=w_{q(z)}$.
 
-The learning rate $\eta$ makes each addition smaller. The app uses 180 trees, a learning rate of 0.05, and maximum depth 3.
+The learning rate $\eta$ makes each addition smaller. The app uses 400 trees, a learning rate of 0.03, and maximum depth 2.
 
 ### Why these tree updates?
 
@@ -141,7 +141,7 @@ $$
 \Omega(f)=\gamma T+\frac{\lambda}{2}\sum_{k=1}^{T}w_k^2.
 $$
 
-Here $\lambda$ discourages large leaf scores, and $\gamma$ is the minimum gain penalty for adding a split. The app explicitly sets $\lambda=2$ and uses the library default $\gamma=0$ and no L1 leaf penalty.
+Here $\lambda$ discourages large leaf scores, and $\gamma$ is the minimum gain penalty for adding a split. The app explicitly sets $\lambda=5$ and uses the library default $\gamma=0$ and no L1 leaf penalty.
 
 At each boosting step, XGBoost approximates the change in loss using first and second derivatives with respect to the current raw score:
 
@@ -177,7 +177,7 @@ This compares the approximate objective before and after splitting. The learning
 
 The configured histogram method groups values into bins to search for splits efficiently. Each tree uses a random 90% sample of training rows and 90% of columns. A fixed seed helps make runs reproducible.
 
-There is no hyperparameter search or early stopping in this version. Both models train with fixed settings. XGBoost optimizes log loss; the separate model-selection criterion is validation average precision.
+The app does not run a hyperparameter search or early stopping. Both models train with fixed settings. The XGBoost settings were revised using the [model improvement study](MODEL_IMPROVEMENT.md), which also explains the evaluation limitations. Minimum child weight is 10, requiring sufficient summed Hessian in each child. XGBoost optimizes log loss; the separate model-selection criterion is validation average precision.
 
 ## 5. Keeping evaluation separate from training
 
