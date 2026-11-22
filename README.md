@@ -1,10 +1,22 @@
 # Customer Churn Prediction Tool
 
-A web app for exploring customer churn: who is most likely to leave, which inputs influence that prediction, and whether a retention offer could be worth its cost.
+The churn dashboard ranks customers by estimated risk, shows which customer details affect individual scores, and compares the estimated benefit of a retention offer with its cost and budget.
 
-The app compares logistic regression with XGBoost, explains individual predictions with SHAP, and calculates retention scenarios. It runs in Streamlit and uses the IBM Telco Customer Churn dataset, also available on Kaggle.
+## Browser app
 
-**[Open the live app](https://customer-churn-tool-gupuvojt3rwndamjdgahnv.streamlit.app/)** · [Reading the dashboard](docs/READING_THE_DASHBOARD.md) · [Methodology](docs/METHODOLOGY.md)
+The current interface is in [web/](web/). The hosted edition requires sign-in. To run the same interface locally, start a static server from the repository root:
+
+```bash
+python -m http.server 8000 --bind 127.0.0.1 --directory web/dist
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000) and try the IBM Telco demo or upload one CSV. The browser processes uploads locally. Historical files with known outcomes can train a model in the browser. Files with the complete IBM Telco or Churn Prediction 2020 inputs can be scored with a built-in model. After training, the same session can score another file with matching inputs.
+
+The risk view supports filtering, individual customer comparisons, and CSV export. Historical results summarize held-out performance. The retention view shows estimated gain or loss, break-even offer success, and whether the plan fits the budget. Offer success is a scenario input.
+
+## Original Streamlit app
+
+The remainder of this README describes the original Python implementation and its documented results.
 
 ## Dashboard preview
 

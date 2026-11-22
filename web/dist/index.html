@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Estimate customer churn, understand risk scores and compare the costs and benefits of retention offers.">
+  <meta name="theme-color" content="#f5f7fc">
+  <title>Churn Prediction App</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 18.5h16M5 14l4-4 4 2 6-7M15.8 5h3.7v3.7" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span>Churn Prediction App</span>
+      </div>
+      <span class="privacy">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 1 1 8 0v3" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>CSV stays in this browser</span>
+      </span>
+    </div>
+  </header>
+
+  <main id="main" class="shell">
+    <section id="landing">
+      <div class="hero">
+        <div class="hero-copy">
+          <h1>See who might leave.<br><span>Decide when to act.</span></h1>
+          <p>Estimate which customers may leave, see what drives their scores, and check whether a retention offer could be worth the cost.</p>
+        </div>
+        <div class="card intake" id="intake">
+          <h2>Start an analysis</h2>
+          <p class="muted">Upload one CSV. The app detects the columns and chooses how to use them.</p>
+          <div id="dropzone" class="dropzone">
+            <span class="upload-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <button id="browse" class="button primary" type="button">Choose CSV</button>
+            <input id="file" type="file" accept=".csv,text/csv,text/plain" tabindex="-1" hidden>
+            <span class="file-hint">CSV up to 10 MB and 15,000 rows</span>
+          </div>
+          <button id="demo" class="button secondary full" type="button">Try the demo</button>
+          <details class="format-help">
+            <summary>Which CSVs work?</summary>
+            <p>Use a historical file with customer details and known churn outcomes to train a model. A CSV with the full IBM Telco or Churn Prediction 2020 inputs can be scored directly. After training, you can score a new CSV with the same inputs.</p>
+          </details>
+        </div>
+      </div>
+      <section class="workflow" aria-label="What you can do">
+        <article>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19h16M7 16v-5m5 5V5m5 11V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div><h2>Prioritize customers</h2><p>Filter the ranked list and export it when you’re ready.</p></div>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="m15 15 4 4m-11-8.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div><h2>Review the signals</h2><p>Open an individual score to see which details move it.</p></div>
+        </article>
+        <article>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v15M7 20h10M5 7h14m-13 0-3 6h6L6 7Zm12 0-3 6h6l-3-6Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div><h2>Check the economics</h2><p>Use the same ranking to compare offer costs with potential savings.</p></div>
+        </article>
+      </section>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="dashboard-head">
+        <div class="dataset">
+          <p id="dataset-type" class="dataset-type"></p>
+          <h1 id="dataset-name" tabindex="-1"></h1>
+          <p id="dataset-meta" class="muted"></p>
+        </div>
+        <div class="actions">
+          <button id="another" class="button secondary" type="button">Open another CSV</button>
+          <button id="reset" class="button text-button" type="button">Start over</button>
+        </div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Analysis views">
+        <button id="tab-risk" type="button" role="tab" aria-selected="true" aria-controls="risk">Customer risk</button>
+        <button id="tab-plan" type="button" role="tab" aria-selected="false" aria-controls="plan" tabindex="-1">Retention plan</button>
+        <button id="tab-history" type="button" role="tab" aria-selected="false" aria-controls="history" tabindex="-1">Historical results</button>
+      </div>
+
+      <section id="risk" role="tabpanel" aria-labelledby="tab-risk">
+        <div class="risk-grid">
+          <div class="card chart-card">
+            <div class="section-head"><h2>Risk distribution</h2><p class="muted">Customers by estimated churn risk. Select a range to filter the list.</p></div>
+            <div id="risk-bins" class="bar-list"></div>
+          </div>
+          <div id="customer-card" class="card chart-card" tabindex="-1">
+            <div class="section-head detail-head">
+              <div><h2>Customer details</h2><p id="customer-id" class="muted customer-id"></p></div>
+              <div class="score-label"><strong id="customer-score"></strong><span>Estimated risk</span></div>
+            </div>
+            <div id="influences" class="bar-list" aria-live="polite"></div>
+            <p class="fine">Each bar compares one input with a typical value. Values show changes in estimated risk, in percentage points.</p>
+          </div>
+          <div class="card list-card">
+            <div class="section-head list-head">
+              <div><h2>Ranked customers</h2><p class="muted">Highest estimated risk first.</p></div>
+              <button id="export" class="button secondary" type="button">Download rankings</button>
+            </div>
+            <div class="list-tools">
+              <label for="search" class="visually-hidden">Search by customer ID</label>
+              <input id="search" type="search" placeholder="Search by customer ID" autocomplete="off">
+              <button id="clear-filter" class="button text-button" type="button" hidden></button>
+            </div>
+            <table class="rank-table">
+              <thead><tr><th scope="col">Customer</th><th scope="col">Estimated risk</th></tr></thead>
+              <tbody id="rank-body"></tbody>
+            </table>
+            <div class="pager">
+              <span id="range-count" aria-live="polite"></span>
+              <div>
+                <button id="previous" class="button secondary" type="button">Previous</button>
+                <button id="next" class="button secondary" type="button">Next</button>
+              </div>
+            </div>
+            <details id="data-notes" class="data-notes" hidden><summary>CSV notes</summary><ul id="notes"></ul></details>
+          </div>
+        </div>
+      </section>
+
+      <section id="plan" role="tabpanel" aria-labelledby="tab-plan" hidden>
+        <div class="plan-grid">
+          <form id="assumptions" class="card chart-card">
+            <div class="section-head"><h2>Offer assumptions</h2><p class="muted">Use one currency and one time period for the amounts.</p></div>
+            <div class="field">
+              <label for="cost">Cost per customer contacted</label>
+              <input id="cost" type="number" inputmode="decimal" min="0" max="1000000000" step="any" value="20" required>
+            </div>
+            <div class="field">
+              <label for="value">Value of keeping one customer</label>
+              <input id="value" type="number" inputmode="decimal" min="0" max="1000000000" step="any" value="500" required>
+            </div>
+            <div class="field">
+              <div class="range-label"><label for="share">Contact share</label><output id="share-value" for="share">20%</output></div>
+              <input id="share" type="range" min="0" max="100" value="20" aria-describedby="share-hint">
+              <p class="fine" id="share-hint">Contact starts with the highest-risk customers.</p>
+            </div>
+            <div class="field">
+              <div class="range-label"><label for="success">Assumed offer success</label><output id="success-value" for="success">15%</output></div>
+              <input id="success" type="range" min="0" max="100" value="15" aria-describedby="success-hint">
+              <p class="fine" id="success-hint">Share of customers who would leave but stay because of the offer.</p>
+            </div>
+            <details class="format-help budget">
+              <summary>Set a campaign budget</summary>
+              <div class="field"><label for="budget">Maximum spend</label><input id="budget" type="number" inputmode="decimal" min="0" max="1000000000" step="any" placeholder="Optional"></div>
+            </details>
+          </form>
+
+          <div class="card chart-card plan-result">
+            <div class="section-head"><h2>Scenario result</h2><p class="muted">A planning estimate based on your inputs and model scores.</p></div>
+            <p id="invalid-plan" class="feedback error" hidden></p>
+            <div id="plan-values">
+              <div id="decision" class="decision" aria-live="polite">
+                <span id="decision-state"></span>
+                <strong id="net"></strong>
+                <p id="decision-copy"></p>
+              </div>
+              <div class="plan-stats">
+                <div><strong id="contacted"></strong><span>Customers contacted</span></div>
+                <div><strong id="break-even"></strong><span>Offer success to break even</span></div>
+              </div>
+              <div id="plan-bars" class="bar-list"></div>
+              <p id="budget-result" class="fine" hidden></p>
+            </div>
+          </div>
+
+          <div class="card chart-card plan-curve" id="curve-card">
+            <div class="section-head"><h2>Savings by contact share</h2><p class="muted">Above zero means an estimated gain. Below zero means an estimated loss. Tap the chart or use the contact share control.</p></div>
+            <canvas id="curve" role="img" aria-label="Scenario net savings by share of customers contacted" aria-describedby="curve-note"></canvas>
+            <p id="curve-note" class="fine"></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="history" role="tabpanel" aria-labelledby="tab-history" hidden>
+        <div class="history-grid">
+          <div class="card chart-card">
+            <div class="section-head"><h2>Observed customer outcomes</h2><p class="muted">Known outcomes in the historical data.</p></div>
+            <div id="outcomes" class="bar-list"></div>
+          </div>
+          <div class="card chart-card">
+            <div class="section-head"><h2>Churn by customer group</h2><p class="muted">Share who left within each group.</p></div>
+            <label for="group-field" class="visually-hidden">Group customers by</label>
+            <select id="group-field"></select>
+            <div id="groups" class="bar-list groups" aria-live="polite"></div>
+          </div>
+          <div class="card chart-card evaluation">
+            <div class="section-head"><h2>How the predictions performed</h2><p id="evaluation-meta" class="muted"></p></div>
+            <div id="model-chart" class="model-chart"></div>
+            <div class="model-detail">
+              <label for="evaluation-model">See counts for</label>
+              <select id="evaluation-model"></select>
+            </div>
+            <div id="evaluation-counts" class="evaluation-counts"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="feedback" class="feedback-area" aria-label="File status">
+      <p id="notice" class="feedback" role="status" aria-live="polite" hidden></p>
+      <div id="mapping" class="card mapping" hidden>
+        <h2>Confirm the churn outcome</h2>
+        <p class="muted">Select the column that records who left and who stayed.</p>
+        <label for="label-choice" class="visually-hidden">Churn outcome column</label>
+        <select id="label-choice"></select>
+        <button id="confirm-label" class="button primary" type="button">Continue</button>
+      </div>
+    </section>
+    <noscript><p class="feedback error">Enable JavaScript in your browser to use this app.</p></noscript>
+  </main>
+
+  <footer class="shell footer"><span>Nikolaos Apostolopoulos</span></footer>
+</body>
+</html>
