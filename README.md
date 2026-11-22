@@ -1,8 +1,8 @@
-# Churn Prediction App
+# Telecom Churn Prediction
 
 [Open the live app](https://nikosapostolo.github.io/customer-churn-tool/) · [Run it locally](#run-locally)
 
-The dashboard helps retention teams decide **who to review, what to look at, and whether an offer could be worth its cost**. It brings customer risk, individual explanations, and the cost of acting on the same ranking into one workflow. You can try it with the IBM Telco demo or upload a single CSV. The browser processes the file locally.
+Identify customers at risk of leaving and test whether a retention offer could be worth the cost. The dashboard brings telecom customer risk, individual explanations, and the cost of acting on the same ranking into one workflow. Try the IBM Telco demo or upload a single CSV. The browser processes the file locally.
 
 ![Current customer risk dashboard showing the risk distribution, individual customer details, and ranked customers](docs/images/overview.jpg)
 
