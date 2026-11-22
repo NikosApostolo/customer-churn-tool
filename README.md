@@ -1,150 +1,54 @@
-# Customer Churn Prediction Tool
+# Churn Prediction App
 
-The churn dashboard ranks customers by estimated risk, shows which customer details affect individual scores, and compares the estimated benefit of a retention offer with its cost and budget.
+[Open the live app](https://customer-churn-private.nickaposto04.chatgpt.site/) · [Run it locally](#run-locally)
 
-## Browser app
+The dashboard helps retention teams decide **who to review, what to look at, and whether an offer could be worth its cost**. It brings customer risk, individual explanations, and the cost of acting on the same ranking into one workflow. You can try it with the IBM Telco demo or upload a single CSV. The browser processes the file locally.
 
-The current interface is in [web/](web/). The hosted edition requires sign-in. To run the same interface locally, start a static server from the repository root:
+![Current customer risk dashboard showing the risk distribution, individual customer details, and ranked customers](docs/images/overview.jpg)
+
+<details>
+<summary>More screenshots of the current app</summary>
+
+**Start an analysis**
+
+![Current landing page with the CSV picker and demo button](docs/images/welcome.jpg)
+
+**Historical results**
+
+![Current historical results with customer outcomes, churn by group, and held-out model performance](docs/images/models.jpg)
+
+**Retention plan**
+
+![Current retention planner showing an estimated loss, offer assumptions, and savings by contact share](docs/images/campaign.jpg)
+
+</details>
+
+## What you can do
+
+| View | What it shows |
+| --- | --- |
+| **Customer risk** | See the distribution of estimated risk, filter or search the ranking, and download it as a CSV. Open a customer to see how the score changes when one input at a time is compared with a typical value. |
+| **Historical results** | Review observed churn, compare groups, and see how the models performed on held-out customers. This view appears when historical outcomes are available. |
+| **Retention plan** | Adjust the contact share, offer cost, customer value, assumed success rate, and optional budget. See the estimated gain or loss, the success rate needed to break even, and the zero-contact baseline. |
+
+## Using your own CSV
+
+- **With known churn outcomes.** Upload a file with customer details and a column that records who left and who stayed. Include at least 100 rows, with at least 20 customers in each outcome group. The browser compares logistic regression and boosted trees, then displays the selected model's scores for held-out customers.
+- **With new customers to score.** Upload a file with the complete IBM Telco or Churn Prediction 2020 inputs to use a built-in model. If you have already trained on your own historical data in this session, **Open another CSV** can score a file with matching inputs.
+- **File format.** Use a UTF-8 CSV with headers, up to 10 MB and 15,000 rows. Supported separators are commas, semicolons, tabs, and pipes. Supply unique customer IDs if you want the exported rankings to use your own identifiers.
+
+Use the risk estimate to prioritize review. Individual score explanations describe the model's response to a change in an input. Retention results depend on your assumed offer success and the model's risk estimates. Measuring the actual effect of an offer requires campaign data.
+
+## Run locally
+
+From the repository root:
 
 ```bash
 python -m http.server 8000 --bind 127.0.0.1 --directory web/dist
 ```
 
-Open [http://127.0.0.1:8000](http://127.0.0.1:8000) and try the IBM Telco demo or upload one CSV. The browser processes uploads locally. Historical files with known outcomes can train a model in the browser. Files with the complete IBM Telco or Churn Prediction 2020 inputs can be scored with a built-in model. After training, the same session can score another file with matching inputs.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The browser app is in [`web/dist/`](web/dist/), including the demo data and model assets. The original Python/Streamlit implementation is in [`app.py`](app.py) and [`src/`](src/). Its [methodology](docs/METHODOLOGY.md) and [model experiments](docs/MODEL_IMPROVEMENT.md) document the earlier implementation.
 
-The risk view supports filtering, individual customer comparisons, and CSV export. Historical results summarize held-out performance. The retention view shows estimated gain or loss, break-even offer success, and whether the plan fits the budget. Offer success is a scenario input.
-
-## Original Streamlit app
-
-The remainder of this README describes the original Python implementation and its documented results.
-
-## Dashboard preview
-
-![Welcome screen](docs/images/welcome.jpg)
-
-![Model comparison](docs/images/overview.jpg)
-
-## Project contribution
-
-A risk score is only part of a retention decision. Someone using the app also needs to understand the prediction and weigh the cost of acting on it.
-
-This project connects those steps in one interface. Users can compare models, inspect individual customers, and change campaign assumptions without running a notebook or writing code. The contribution is the integration of evaluation, explanations, and business calculations into a usable application. It uses established methods rather than introducing a new machine learning algorithm.
-
-## Using the app
-
-The opening screen introduces the project and its prediction → explanation → retention workflow. Choose **Sample data** and click **Use sample data**, or select **Upload CSV**. Once loaded, **Change customer data** lets you switch inputs. Use **Explore the dashboard** to move between five sections:
-
-| Section | What it shows | Question it answers |
-|---|---|---|
-| Customers | Outcome counts, missing values, churn within groups | What does the historical data contain? |
-| Models | Precision/recall bars, precision–recall curves, a confusion-matrix heatmap | How useful are the predictions, and where are the mistakes? |
-| Individual risk | Score distribution, a churn-capture curve, a ranked list, individual SHAP bars | Who receives high scores, and which inputs influence them? |
-| Score active customers | Upload a second CSV, inspect scores and explanations, and download rankings | Who should I consider contacting now? |
-| Retention plan | Cost/benefit bars and savings across campaign sizes | What could contacting these customers cost or save? |
-
-Charts include labeled axes, short explanations, and tap/hover details. On narrow screens, charts and controls stack vertically, summary cards use two columns, and navigation uses a full-width section selector. Customer group counts are also available in an expandable table. Campaign inputs and the selected customer are preserved when switching sections. Detailed interpretation, worked examples, and caveats are in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
-
-The app downloads the sample automatically. If the download fails, it uses clearly labeled fictional data so the interface remains usable.
-
-**Score active customers** accepts a second CSV with a unique `customerID`, the same model inputs as the historical file, and no `Churn` column. The selected model scores this file using the fitted training pipeline. Historical test metrics stay separate. Use the sample to download two disjoint CSVs and try the full workflow. The scoring sample reuses held-out historical rows with outcomes removed.
-
-## How it works
-
-Customers are split into 60% training, 20% validation, and 20% testing, using a fixed random seed. Each group retains approximately the original churn proportion.
-
-Numeric fields are checked for invalid values, and text fields are standardized. Missing-value replacements, numerical scaling, and category encoding are fitted on training customers only. Customer IDs and the churn outcome are excluded from model inputs.
-
-Logistic regression provides a simple baseline. XGBoost captures more complex relationships through an ensemble of decision trees. Validation average precision selects the model; test data is reserved for the final comparison. Both models use a fixed 0.50 classification threshold.
-
-SHAP explanations work with either selected model. The chart groups contributions into the original customer fields, such as contract type and tenure. Positive contributions increase the model score; negative contributions decrease it. These contributions use log-odds, the model's internal score scale, rather than percentage-point changes in probability.
-
-See [Methodology](docs/METHODOLOGY.md) for the implementation details and [Mathematical modelling](docs/MATHEMATICAL_MODELLING.md) for the equations behind preprocessing, both models, evaluation, SHAP, and retention scenarios.
-
-## Results
-
-The [model improvement study](docs/MODEL_IMPROVEMENT.md) records the nested validation experiments, full results, and limitations behind the updated XGBoost settings.
-
-
-Measured on the 7,043-row IBM Telco sample with the supplied code:
-
-| Model | Validation AP | Test precision | Test recall | Test AP | Test Brier |
-|---|---:|---:|---:|---:|---:|
-| Logistic regression | 0.6423 | 0.6509 | 0.5535 | 0.6338 | 0.1378 |
-| XGBoost | 0.6480 | 0.6643 | 0.5027 | 0.6674 | 0.1345 |
-
-XGBoost was selected by validation average precision, although the difference was small. Logistic regression had higher recall at the fixed threshold. The results show a tradeoff rather than a clear advantage on every measure.
-
-- **Precision:** among customers flagged as leaving, the fraction who actually left.
-- **Recall:** among customers who left, the fraction flagged by the model.
-- **Average precision (AP):** summarizes ranking quality across thresholds; higher is better and should be interpreted against the churn rate.
-- **Brier score:** average squared probability error; lower is better.
-
-The app also shows a confusion matrix with the counts of correct and incorrect stay/leave predictions. Results differ for uploaded data and the fictional fallback.
-
-## Run locally
-
-Use Python 3.12. From the project folder on Windows:
-
-```bat
-py -3.12 -m venv .venv
-.venv\Scripts\activate.bat
-python -m pip install -r requirements.txt
-python -m streamlit run app.py
-```
-
-On macOS/Linux, replace the first two commands with:
-
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-```
-
-Open http://localhost:8501. No API keys are required.
-
-To run the automated checks:
-
-```bash
-python -m pytest -q
-```
-
-The project was checked on Python 3.12.14 on Linux, with 21 tests passing. Checks cover input validation, offline loading, data splits, training-only preprocessing, both SHAP explainers, business calculations, uploads, caching, chart serialization, group summaries, and agreement between the savings curve and calculator.
-
-## Repository structure
-
-| Path | Responsibility |
-|---|---|
-| `app.py` | Streamlit interface, charts, caching, and error messages |
-| `src/data.py` | Data loading, format cleaning, validation, and offline sample |
-| `src/model.py` | Preprocessing, splitting, training, evaluation, and ranking |
-| `src/explain.py` | Individual SHAP explanations |
-| `src/business.py` | Retention scenario calculations |
-| `src/charts.py` | Interactive charts and visual summaries |
-| `src/layout.py`, `src/styles.css` | Responsive layout, section navigation, and touch-friendly controls |
-| `tests/test_basic.py` | Automated checks |
-| `docs/MATHEMATICAL_MODELLING.md` | Equations, derivations, and worked examples |
-| `docs/METHODOLOGY.md` | Data requirements and implementation details |
-| `docs/READING_THE_DASHBOARD.md` | Chart interpretation, examples, and caveats |
-| `.streamlit/config.toml` | Consistent light theme and upload limit |
-| `requirements.txt` | Pinned application dependencies |
-
-## Limitations
-
-Churn models find patterns, not proven causes. An input that influences a prediction is not necessarily something a business can change to prevent churn. SHAP explains the model's behavior, so a suggested action may not fix the problem.
-
-The savings calculation depends on an assumed offer success rate and model risk estimates. Neither probability calibration nor campaign impact has been established. A randomized retention experiment would be needed to measure the effect of an offer.
-
-The sample is an older demonstration dataset. A random split does not establish performance on future customers, and fairness across customer groups has not been assessed. Use with another business would require a defined prediction horizon, time-based evaluation where possible, and checks on probability quality and sensitive features.
-
-Historical uploads require supported Telco-style columns and known churn outcomes. Scoring uploads require the corresponding inputs available at the time the prediction is made. The Telco sample does not validate performance over a future time window. Use public or fictional data for this portfolio app: uploaded data is processed on the server and temporarily cached in memory. The app does not provide production access controls.
-
-## Data sources
-
-- [IBM Telco Customer Churn repository](https://github.com/IBM/telco-customer-churn-on-icp4d)
-- [Telco Customer Churn on Kaggle](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
+Demo data source: [IBM Telco Customer Churn](https://github.com/IBM/telco-customer-churn-on-icp4d).
 
 **Author:** Nikolaos Apostolopoulos
-
-
-## Interface
-
-The main views focus on customer outcomes, model comparison, individual explanations, and retention scenarios. Supporting charts and technical details are expandable. The retention view includes the success assumption needed to break even. Detailed chart interpretation is in [Reading the dashboard](docs/READING_THE_DASHBOARD.md).
