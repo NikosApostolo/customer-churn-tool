@@ -1,4 +1,4 @@
-"""Export original fitted churn models for browser inference."""
+"""Fit and export the built-in churn models for browser inference."""
 import argparse
 import json
 import math
@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
 
 parser = argparse.ArgumentParser()
 parser.add_argument("source", type=Path, help="Original customer-churn-tool checkout")
@@ -15,14 +18,34 @@ args = parser.parse_args()
 sys.path.insert(0, str(args.source.resolve()))
 
 from src.data import clean_data, read_csv_bytes
-from src.model import train_models
+from src.model import SEED, make_preprocessor, train_models
+
+
+def fit_telecom2020(X, y, train):
+    """Use the configuration selected on the Churn Prediction 2020 development folds."""
+    pipeline = Pipeline([
+        ("prepare", make_preprocessor(X)),
+        ("model", XGBClassifier(
+            n_estimators=400, max_depth=6, learning_rate=0.045,
+            subsample=0.9, colsample_bytree=0.9, reg_lambda=4,
+            min_child_weight=1, objective="binary:logistic", eval_metric="logloss",
+            random_state=SEED, n_jobs=1, tree_method="hist",
+        )),
+    ])
+    return pipeline.fit(X.iloc[train], y.iloc[train])
 
 
 def export(name, path):
     data = read_csv_bytes(path.read_bytes())
     X, y, ids, _ = clean_data(data)
     result = train_models(X, y)
-    pipeline = result["models"][result["winner"]]
+    winner = result["winner"]
+    test = result["test_idx"]
+    models = result["models"]
+    if name == "telecom2020":
+        winner = "XGBoost"
+        models[winner] = fit_telecom2020(X, y, result["train_idx"])
+    pipeline = models[winner]
     prepare, model = pipeline["prepare"], pipeline["model"]
     numeric = prepare.transformers_[0][2]
     categorical = prepare.transformers_[1][2]
@@ -37,7 +60,7 @@ def export(name, path):
          "reference": str(X.iloc[result["train_idx"]][c].fillna("missing").mode().iloc[0])}
         for c, categories in zip(categorical, encoder.categories_)
     ]
-    if result["winner"] == "XGBoost":
+    if winner == "XGBoost":
         booster = model.get_booster()
         config = json.loads(booster.save_config())
         base = float(config["learner"]["learner_model_param"]["base_score"])
@@ -54,21 +77,26 @@ def export(name, path):
     else:
         estimator = {"kind": "logistic", "base": float(model.intercept_[0]),
                      "weights": model.coef_[0].tolist()}
-    test = result["test_idx"]
+    metrics = []
+    for label, candidate in models.items():
+        predicted = candidate.predict_proba(X.iloc[test])[:, 1] >= 0.5
+        truth = y.iloc[test]
+        metrics.append({
+            "name": label,
+            "precision": precision_score(truth, predicted, zero_division=0),
+            "recall": recall_score(truth, predicted, zero_division=0),
+            "matrix": confusion_matrix(truth, predicted, labels=[0, 1]).tolist(),
+        })
     out = {
-        "winner": result["winner"],
+        "winner": winner,
         "columns": columns,
         "estimator": estimator,
         "test": test.tolist(),
-        "metrics": [
-            {"name": row["Model"], "precision": row["Test precision"], "recall": row["Test recall"],
-             "matrix": result["matrices"][row["Model"]].tolist()}
-            for row in result["metrics"].to_dict("records")
-        ],
+        "metrics": metrics,
         "testScores": pipeline.predict_proba(X.iloc[test])[:, 1].tolist(),
     }
     Path(f"dist/data/{name}.json").write_text(json.dumps(out, separators=(",", ":"), allow_nan=False))
-    print(name, len(X), int(np.sum(y)), result["winner"])
+    print(name, len(X), int(np.sum(y)), winner)
 
 
 export("ibm", args.telco)

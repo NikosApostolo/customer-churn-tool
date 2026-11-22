@@ -39,6 +39,8 @@ Identify customers at risk of leaving and test whether a retention offer could b
 
 Use the risk estimate to prioritize review. Individual score explanations describe the model's response to a change in an input. Retention results depend on your assumed offer success and the model's risk estimates. Measuring the actual effect of an offer requires campaign data.
 
+The two built-in telecom profiles were evaluated separately. See the [browser model comparison](docs/MODEL_IMPROVEMENT.md#browser-profiles) for the results.
+
 ## Run locally
 
 From the repository root:

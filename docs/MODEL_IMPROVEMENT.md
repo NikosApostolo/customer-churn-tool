@@ -1,12 +1,36 @@
 # Model improvement study
 
-## Conclusion
+## Browser profiles
 
-A smaller, more strongly constrained XGBoost model produced a modest and reasonably consistent improvement in this study. It is now the app's XGBoost configuration. This is evidence within the Telco sample, not proof of better performance for another company or future customers.
+The browser app uses separate built-in profiles for the IBM Telco and Churn Prediction 2020 schemas. The Churn Prediction 2020 profile now uses a deeper XGBoost model. The IBM profile uses the shallower configuration from the earlier study below.
+
+The comparison used 7,043 labeled IBM Telco rows and 4,250 labeled Churn Prediction 2020 rows. For each dataset, the published test rows were excluded from model selection. On the remaining rows, four outer stratified folds evaluated the selection process. Three inner folds chose among the current depth-2 model and variants with depths 3–6. Imputation and encoding were fitted within each training fold. Selection used average precision (AP), which measures how well the model ranks customers who actually left. Brier score measures probability error. Lower is better.
+
+| Built-in profile | Mean outer-fold AP, old → selected | Mean outer-fold Brier, old → selected | Decision |
+| --- | ---: | ---: | --- |
+| IBM Telco | 0.6714 → 0.6714 | 0.1332 → 0.1332 | Keep depth 2 |
+| Churn Prediction 2020 | 0.7788 → 0.8793 | 0.0590 → 0.0362 | Use depth 6 |
+
+The depth-6 variant won on all four Churn Prediction 2020 outer folds. After the choice was fixed, it was fitted on the same training rows as the previous browser profile and checked on the existing 850-row test split:
+
+| Churn Prediction 2020 test metric | Previous | Updated |
+| --- | ---: | ---: |
+| Average precision | 0.7746 | 0.8554 |
+| Brier score | 0.0618 | 0.0376 |
+| Churners found among the highest-risk 20% of customers | 79.2% | 83.3% |
+| Actual churners flagged at 50% risk | 55.0% | 73.3% |
+
+An additional sigmoid calibration step failed to improve mean Brier score. The exported profile uses the model's raw probability estimates. The [profile exporter](../web/tools/export_profiles.py) records the exact configuration. These comparisons reuse labeled data from the same datasets and do not establish performance on later customers. The separate 750-row Churn Prediction 2020 scoring file was used for inference checks because it has no labels. The app's browser-trained models for custom historical uploads use a separate training path.
+
+## Earlier Streamlit study
+
+### Conclusion
+
+A smaller, more strongly constrained XGBoost model produced a modest and reasonably consistent improvement on the IBM Telco sample. This configuration is used by the original Streamlit app and the built-in IBM browser profile.
 
 Average precision (AP) measures ranking quality across decision thresholds. An AP of 0.66 does not mean 66% accuracy or that every flagged customer has a 66% chance of leaving. The sample churn rate is approximately 26.5%, a useful reference for an uninformative ranking.
 
-## What changed
+### What changed
 
 | Setting | Previous | Updated |
 |---|---:|---:|
@@ -20,7 +44,7 @@ Shallower trees make fewer chained decisions. Stronger leaf penalties and a larg
 
 The inputs, cleaning, 60/20/20 app split, logistic baseline, classification threshold, SHAP implementation, business formula, and interface are unchanged. No new dependencies are required.
 
-## Evaluation protocol
+### Evaluation protocol
 
 The 1,409 customers in the already-published test split were excluded from model development. The remaining 5,634 customers were used for the experiment.
 
@@ -38,7 +62,7 @@ The outer split seed is 2026; inner split seed is 101. The original published-te
 
 Nested validation separates choosing settings from evaluating the procedure. See [scikit-learn's explanation](https://scikit-learn.org/stable/auto_examples/model_selection/plot_nested_cross_validation_iris.html).
 
-## Results on development customers
+### Results on development customers
 
 These are mean outer-fold results, with identical training and evaluation customers for each candidate.
 
@@ -54,7 +78,7 @@ The inner procedure selected shallower XGBoost in all five outer folds. Therefor
 
 Fold-to-fold AP standard deviations were approximately 0.0184 for the existing model and 0.0226 for the shallower model. These describe variation across folds, not confidence intervals. The improvement is small relative to variation in absolute scores.
 
-### Additional stability check
+#### Additional stability check
 
 After the nested experiment, both fixed XGBoost configurations were compared over five folds using seed 2027 and five using seed 2028. The published test customers remained excluded.
 
@@ -65,7 +89,7 @@ After the nested experiment, both fixed XGBoost configurations were compared ove
 
 The shallower model had higher AP in 8 of 10 comparisons. These folds overlap and reuse the development dataset; they are a follow-up stability check, not ten independent confirmations or fresh external tests. No further configuration changes were made based on these results.
 
-## Check on the existing app split
+### Check on the existing app split
 
 After fixing the new configuration, the normal app training entry point was run once. It still trains on 60%, selects the model on 20%, and reports the remaining 20%.
 
@@ -81,7 +105,7 @@ The updated model was still selected over logistic regression on validation AP. 
 
 The existing test results had already been published and discussed before this study. This check is therefore a secondary comparison on a previously exposed test set, not a pristine new final test. The nested results use more training data per outer fit than the app's 60% fit, so their absolute scores should not be compared directly to the app test AP.
 
-## Reproduce the experiment
+### Reproduce the experiment
 
 Use the pinned project requirements and a copy of the original IBM CSV. The script refuses to substitute fictional fallback data: pass the actual CSV path.
 
@@ -106,7 +130,7 @@ The dataset SHA-256 is `16320c9c1ec72448db59aa0a26a0b95401046bef5d02fd3aeb906448
 
 The experiment and all 21 existing tests ran successfully on Python 3.12 with scikit-learn 1.5.2 and XGBoost 2.1.4. Tests cover preprocessing isolation, split isolation, predictions, both SHAP explainers, business calculations, charts, and Streamlit sample/upload flows. Dependency deprecation warnings remain.
 
-## What this does and does not establish
+### What this does and does not establish
 
 This study supports a small ranking improvement on held-out portions of this dataset. It cannot prove that overfitting is absent, and it does not establish transfer to another dataset. Additional tuning against these same evaluations would weaken their value.
 
