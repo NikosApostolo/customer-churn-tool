@@ -1,6 +1,6 @@
 # Churn Prediction App
 
-[Open the live app](https://customer-churn-private.nickaposto04.chatgpt.site/) · [Run it locally](#run-locally)
+[Open the live app](https://nikosapostolo.github.io/customer-churn-tool/) · [Run it locally](#run-locally)
 
 The dashboard helps retention teams decide **who to review, what to look at, and whether an offer could be worth its cost**. It brings customer risk, individual explanations, and the cost of acting on the same ranking into one workflow. You can try it with the IBM Telco demo or upload a single CSV. The browser processes the file locally.
 
